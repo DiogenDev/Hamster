@@ -67,10 +67,10 @@ export function useHamsterBrain({
   const [particles, setParticles] = useState<Particle[]>([]);
 
   // Высокочастотные координаты в виртуальном буфере 480x180
-  // Уровень пола клетки: y = 118 (при высоте спрайта 48px, ножки стоят на опилках y=142)
+  // Уровень пола клетки: y = 100 (при высоте спрайта 44px, ножки стоят на опилках y=144)
   const posRef = useRef({
     x: 220,
-    y: 118,
+    y: 100,
     vx: 0,
     targetX: 220,
     flipX: false,
