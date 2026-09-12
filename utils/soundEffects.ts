@@ -1,34 +1,6 @@
 /**
  * ============================================================================
- * МОДУЛЬ: 8-БИТНЫЙ АУДИОСИНТЕЗАТОР (Web Audio API Chiptune Engine)
- * ============================================================================
- * 
- * 🎓 ИНТЕРАКТИВНЫЙ УЧЕБНИК: АРХИТЕКТУРНОЕ ОБОСНОВАНИЕ
- * ----------------------------------------------------------------------------
- * 1. ЗАЧЕМ ЭТО НУЖНО (Architectural Reason):
- *    Вместо скачивания десятков внешних MP3/WAV-файлов (которые долго грузятся,
- *    могут отдавать 404 на сервере и увеличивают размер бандла), мы синтезируем
- *    звуки прямо в браузере с помощью Web Audio API.
- *    Это обеспечивает:
- *    - 0 килобайт сетевого трафика.
- *    - 0 задержек (ноль лагов при воспроизведении).
- *    - Аутентичный 8-битный звук приставок GameBoy/NES (квадратные и треугольные волны).
- * 
- * 2. КАК ЭТО РАБОТАЕТ (Algorithmic Essence):
- *    Мы строим граф аудио-нод:
- *    [OscillatorNode (генератор волны)] ---> [GainNode (огибающая громкости ADSR)] ---> [AudioDestination (динамики)]
- *    - Square (прямоугольная волна): резкий, характерный звук NES/Chiptune (еда, прыжки, клики).
- *    - Sine (синусоида): мягкий чистый тон для мурлыканья и поглаживания.
- *    - Triangle (треугольная волна): басовитый мягкий тембр для зевка и сна.
- *    - White Noise (белый шум через AudioBuffer): шуршание опилок и уборка клетки.
- * 
- * 3. ПОДВОДНЫЕ КАМНИ (Pitfalls & Browser Autoplay Policy):
- *    - Все современные браузеры (Chrome, Safari, Firefox) запрещают воспроизведение звука
- *      до первого клика пользователя на странице (`audioContext.state === 'suspended'`).
- *    - Решение: Ленивая инициализация `AudioContext` и вызов `audioCtx.resume()`
- *      при первом действии игрока.
- *    - Утечки памяти: узлы OscillatorNode одноразовые. После `stop()` их обязательно
- *      нужно отключать (`disconnect()`), иначе они висят в памяти Web Audio.
+ * МОДУЛЬ: 8-БИТНЫЙ АУДИОСИНТЕЗАТОР (Web Audio API V2)
  * ============================================================================
  */
 
@@ -37,9 +9,6 @@ class SoundEngine {
   private isEnabled: boolean = true;
   private volume: number = 0.5;
 
-  /**
-   * Ленивое получение или создание AudioContext при первом жесте игрока
-   */
   private getContext(): AudioContext | null {
     if (typeof window === 'undefined') return null;
 
@@ -51,9 +20,7 @@ class SoundEngine {
     }
 
     if (this.ctx && this.ctx.state === 'suspended') {
-      this.ctx.resume().catch(() => {
-        // Игнорируем ошибку, если пользователь еще не кликнул
-      });
+      this.ctx.resume().catch(() => {});
     }
 
     return this.ctx;
@@ -67,9 +34,6 @@ class SoundEngine {
     this.volume = Math.max(0, Math.min(1, volume));
   }
 
-  /**
-   * 8-битный звук поедания корма (серия быстрых хрустящих щелчков)
-   */
   public playEatSound() {
     if (!this.isEnabled) return;
     const ctx = this.getContext();
@@ -103,9 +67,6 @@ class SoundEngine {
     });
   }
 
-  /**
-   * Нежный звук поглаживания хомячка (восходящее синусоидальное глиссандо)
-   */
   public playPetSound() {
     if (!this.isEnabled) return;
     const ctx = this.getContext();
@@ -116,9 +77,8 @@ class SoundEngine {
     const gain = ctx.createGain();
 
     osc.type = 'sine';
-    // Плавный подъем высоты тона от 400Hz до 800Hz
     osc.frequency.setValueAtTime(400, now);
-    osc.frequency.exponentialRampToValueAtTime(800, now + 0.18);
+    osc.frequency.exponentialRampToValueAtTime(850, now + 0.18);
 
     gain.gain.setValueAtTime(0.01, now);
     gain.gain.linearRampToValueAtTime(this.volume * 0.4, now + 0.08);
@@ -136,9 +96,6 @@ class SoundEngine {
     }, 300);
   }
 
-  /**
-   * Звук сна / засыпания (убаюкивающее сопение на треугольной волне)
-   */
   public playSleepSound() {
     if (!this.isEnabled) return;
     const ctx = this.getContext();
@@ -168,9 +125,6 @@ class SoundEngine {
     }, 500);
   }
 
-  /**
-   * Забавный пиксельный шлепок дефекации
-   */
   public playPoopSound() {
     if (!this.isEnabled) return;
     const ctx = this.getContext();
@@ -199,16 +153,13 @@ class SoundEngine {
     }, 200);
   }
 
-  /**
-   * Звук уборки клетки / волшебного блеска (чирикающий перелив)
-   */
   public playCleanSound() {
     if (!this.isEnabled) return;
     const ctx = this.getContext();
     if (!ctx) return;
 
     const now = ctx.currentTime;
-    const freqs = [523.25, 659.25, 783.99, 1046.5]; // До-Ми-Соль-До
+    const freqs = [523.25, 659.25, 783.99, 1046.5];
 
     freqs.forEach((freq, idx) => {
       const startTime = now + idx * 0.05;
@@ -234,9 +185,35 @@ class SoundEngine {
     });
   }
 
-  /**
-   * Звук нажатия на пиксельную кнопку меню
-   */
+  public playWheelSound() {
+    if (!this.isEnabled) return;
+    const ctx = this.getContext();
+    if (!ctx) return;
+
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(320, now);
+    osc.frequency.linearRampToValueAtTime(360, now + 0.08);
+    osc.frequency.linearRampToValueAtTime(300, now + 0.15);
+
+    gain.gain.setValueAtTime(this.volume * 0.15, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.start(now);
+    osc.stop(now + 0.16);
+
+    setTimeout(() => {
+      osc.disconnect();
+      gain.disconnect();
+    }, 200);
+  }
+
   public playClickSound() {
     if (!this.isEnabled) return;
     const ctx = this.getContext();
@@ -265,9 +242,6 @@ class SoundEngine {
     }, 100);
   }
 
-  /**
-   * Радостный джингл выполнения действия или полного насыщения
-   */
   public playSuccessJingle() {
     if (!this.isEnabled) return;
     const ctx = this.getContext();
@@ -275,10 +249,10 @@ class SoundEngine {
 
     const now = ctx.currentTime;
     const notes = [
-      { f: 523.25, d: 0.08 }, // C5
-      { f: 659.25, d: 0.08 }, // E5
-      { f: 783.99, d: 0.08 }, // G5
-      { f: 1046.5, d: 0.22 }, // C6
+      { f: 523.25, d: 0.08 },
+      { f: 659.25, d: 0.08 },
+      { f: 783.99, d: 0.08 },
+      { f: 1046.5, d: 0.22 },
     ];
 
     let t = now;
@@ -303,5 +277,4 @@ class SoundEngine {
   }
 }
 
-// Экспортируем единственный синглтон-экземпляр
 export const soundManager = new SoundEngine();

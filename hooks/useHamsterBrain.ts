@@ -1,32 +1,21 @@
 /**
  * ============================================================================
- * КАСТОМНЫЙ ХУК: useHamsterBrain (Конечный Автомат и Искусственный Интеллект)
+ * КАСТОМНЫЙ ХУК: useHamsterBrain (FSM V2: Беговое Колесо, Умывание, Дзен-Режим)
  * ============================================================================
  * 
  * 🎓 ИНТЕРАКТИВНЫЙ УЧЕБНИК: АРХИТЕКТУРНОЕ ОБОСНОВАНИЕ
  * ----------------------------------------------------------------------------
- * 1. ЗАЧЕМ ЭТО НУЖНО (Architectural Reason):
- *    Поведение живого питомца — это не случайный набор реакций, а модель
- *    Конечного Автомата (Finite State Machine, FSM), управляемая внутренними
- *    потребностями (Hunger, Energy, Hygiene, Happiness, Health).
- *    Вынесение логики ИИ в отдельный хук изолирует геймплейные правила от рендеринга
- *    (Принцип единственной ответственности - Single Responsibility Principle).
+ * 1. ПАНОРАМНОЕ ПЕРЕМЕЩЕНИЕ И НОВЫЕ ПОВЕДЕНИЯ:
+ *    Широкая клетка (480px) дает питомцу пространство для полноценного исследования.
+ *    Мы добавили интерактивные точки интереса:
+ *    - Беговое колесо (x = 34): хомячок запрыгивает в колесо (`WHEEL`) и бегает с удовольствием.
+ *    - Зона умывания (`GROOM`): чистит шерстку и ушки.
+ *    - Зона обнюхивания (`SNIFF`): принюхивается к опилкам.
  * 
- * 2. КАК ЭТО РАБОТАЕТ (Algorithmic Essence):
- *    - Внутренние таймеры:
- *      Каждые 25 секунд голод падает на 1 ед.
- *      Каждые 35 секунд бодрствования энергия падает на 1 ед. Во сне — восстанавливается!
- *    - Взвешенные переходы FSM (Markov Decision Chain):
- *      В состоянии IDLE хомяк каждые 3-7 секунд выбирает следующее действие на основе весов:
- *        * Если энергия < 20: 70% шанс заснуть (SLEEP).
- *        * Если гигиена < 35: 80% позыв в туалет (POOPING).
- *        * Обычное состояние: 50% бродить по клетке (WALK), 30% прилечь (LAYING), 20% остаться в IDLE.
- * 
- * 3. ПОДВОДНЫЕ КАМНИ (Pitfalls & Gotchas):
- *    - Застревание в циклах состояний: Если не ограничивать таймеры состояний,
- *      хомяк может вечно ходить туда-сюда. Каждое состояние имеет строгое время жизни (`stateTime`).
- *    - Состояние сна: Если игрок пытается кормить спящего хомяка, стейт-машина должна
- *      либо разбудить его, либо отклонить действие с эмодзи 💤.
+ * 2. ДЗЕН-РЕЖИМ (Zen Mode):
+ *    Если `zenMode === true` или конкретный стат отключен в настройках,
+ *    таймеры деградации блокируются, а показатели фиксируются на 100%.
+ *    Хомячок ведет себя беззаботно, радуя владельца живыми анимациями.
  * ============================================================================
  */
 
@@ -40,6 +29,7 @@ import {
   EmoteBubble,
   Particle,
   FoodItem,
+  DisabledStatsConfig,
 } from '@/types/hamster';
 import { soundManager } from '@/utils/soundEffects';
 
@@ -47,6 +37,8 @@ export interface HamsterBrainProps {
   initialNeeds: HamsterNeeds;
   initialBehavior: HamsterBehavior;
   initialPoops: PoopItem[];
+  zenMode?: boolean;
+  disabledStats?: DisabledStatsConfig;
   onNeedsChange?: (needs: HamsterNeeds) => void;
   onBehaviorChange?: (behavior: HamsterBehavior) => void;
   onPoopsChange?: (poops: PoopItem[]) => void;
@@ -56,23 +48,31 @@ export function useHamsterBrain({
   initialNeeds,
   initialBehavior,
   initialPoops,
+  zenMode = false,
+  disabledStats = {
+    hunger: false,
+    energy: false,
+    hygiene: false,
+    happiness: false,
+    health: false,
+  },
   onNeedsChange,
   onBehaviorChange,
   onPoopsChange,
 }: HamsterBrainProps) {
-  // Текущее дискретное поведение для UI
   const [behavior, setBehavior] = useState<HamsterBehavior>(initialBehavior);
   const [needs, setNeeds] = useState<HamsterNeeds>(initialNeeds);
   const [poops, setPoops] = useState<PoopItem[]>(initialPoops);
   const [emotes, setEmotes] = useState<EmoteBubble[]>([]);
   const [particles, setParticles] = useState<Particle[]>([]);
 
-  // Высокочастотные физические параметры в Ref (без ререндеров React 60 раз/сек)
+  // Высокочастотные координаты в виртуальном буфере 480x180
+  // Уровень пола клетки: y = 118 (при высоте спрайта 48px, ножки стоят на опилках y=142)
   const posRef = useRef({
-    x: 140, // Начальная позиция X в виртуальном буфере 320x240
-    y: 172, // Уровень пола клетки (лапки касаются пола)
+    x: 220,
+    y: 118,
     vx: 0,
-    targetX: 140,
+    targetX: 220,
     flipX: false,
   });
 
@@ -87,16 +87,20 @@ export function useHamsterBrain({
   const poopsRef = useRef<PoopItem[]>(initialPoops);
   poopsRef.current = poops;
 
-  // Таймеры спада потребностей
+  const zenModeRef = useRef<boolean>(zenMode);
+  zenModeRef.current = zenMode;
+
+  const disabledStatsRef = useRef<DisabledStatsConfig>(disabledStats);
+  disabledStatsRef.current = disabledStats;
+
+  // Таймеры
   const hungerTimerRef = useRef<number>(0);
   const energyTimerRef = useRef<number>(0);
   const hygieneTimerRef = useRef<number>(0);
   const healthTimerRef = useRef<number>(0);
   const sleepZzzTimerRef = useRef<number>(0);
+  const wheelSoundTimerRef = useRef<number>(0);
 
-  /**
-   * Запуск всплывающего эмодзи-баббла
-   */
   const triggerEmote = useCallback((emoji: EmoteBubble['emoji']) => {
     const newEmote: EmoteBubble = {
       id: `emote_${Date.now()}_${Math.random()}`,
@@ -109,9 +113,6 @@ export function useHamsterBrain({
     setEmotes((prev) => [...prev.slice(-2), newEmote]);
   }, []);
 
-  /**
-   * Спавн пиксельных частиц (сердечки, крошки, искры)
-   */
   const spawnParticles = useCallback(
     (
       count: number,
@@ -140,9 +141,6 @@ export function useHamsterBrain({
     []
   );
 
-  /**
-   * Смена поведения хомяка
-   */
   const changeBehavior = useCallback(
     (newBehavior: HamsterBehavior, customDuration?: number) => {
       behaviorRef.current = newBehavior;
@@ -151,10 +149,19 @@ export function useHamsterBrain({
       stateDurationRef.current = customDuration ?? (3 + Math.random() * 4);
 
       if (newBehavior === HamsterBehavior.WALK) {
-        // Выбираем новую цель блуждания по полу клетки (между x=60 и x=240)
-        const targetX = Math.floor(60 + Math.random() * 180);
+        // Выбираем новую случайную цель по широкому дну клетки (x: 75 .. 410)
+        const targetX = Math.floor(75 + Math.random() * 335);
         posRef.current.targetX = targetX;
         posRef.current.flipX = targetX < posRef.current.x;
+      } else if (newBehavior === HamsterBehavior.WHEEL) {
+        posRef.current.x = 34;
+        posRef.current.flipX = false;
+        soundManager.playWheelSound();
+        triggerEmote('🎡');
+      } else if (newBehavior === HamsterBehavior.GROOM) {
+        triggerEmote('✨');
+      } else if (newBehavior === HamsterBehavior.SNIFF) {
+        triggerEmote('🌾');
       } else if (newBehavior === HamsterBehavior.POOPING) {
         soundManager.playPoopSound();
         triggerEmote('💩');
@@ -169,8 +176,16 @@ export function useHamsterBrain({
   );
 
   /**
-   * Погладить хомяка
+   * Отправить хомяка побегать в колесо
    */
+  const goToWheel = useCallback(() => {
+    if (behaviorRef.current === HamsterBehavior.SLEEP) {
+      triggerEmote('💤');
+      return;
+    }
+    changeBehavior(HamsterBehavior.WHEEL, 6);
+  }, [changeBehavior, triggerEmote]);
+
   const pet = useCallback(() => {
     if (behaviorRef.current === HamsterBehavior.SLEEP) {
       triggerEmote('💤');
@@ -179,65 +194,62 @@ export function useHamsterBrain({
 
     soundManager.playPetSound();
     triggerEmote('💖');
-    spawnParticles(4, posRef.current.x + 20, posRef.current.y, '#ff4081', '💖');
+    spawnParticles(4, posRef.current.x + 24, posRef.current.y, '#ff4081', '💖');
 
-    setNeeds((prev) => {
-      const next = {
-        ...prev,
-        happiness: Math.min(100, prev.happiness + 15),
-      };
-      onNeedsChange?.(next);
-      return next;
-    });
+    if (!zenModeRef.current && !disabledStatsRef.current.happiness) {
+      setNeeds((prev) => {
+        const next = {
+          ...prev,
+          happiness: Math.min(100, prev.happiness + 15),
+        };
+        onNeedsChange?.(next);
+        return next;
+      });
+    }
   }, [triggerEmote, spawnParticles, onNeedsChange]);
 
-  /**
-   * Накормить хомячка выбранным блюдом
-   */
   const feed = useCallback(
     (food: FoodItem) => {
       if (behaviorRef.current === HamsterBehavior.SLEEP) {
-        // Спящий хомяк просыпается от запаха еды
         changeBehavior(HamsterBehavior.IDLE);
       }
 
       soundManager.playEatSound();
       triggerEmote('🌾');
       changeBehavior(HamsterBehavior.EATING, food.eatingDurationSec);
-      spawnParticles(5, posRef.current.x + 20, posRef.current.y + 10, '#f4a261');
+      spawnParticles(5, posRef.current.x + 24, posRef.current.y + 10, '#f4a261');
 
-      // Обновляем показатели
-      setNeeds((prev) => {
-        const next = {
-          ...prev,
-          hunger: Math.min(100, prev.hunger + food.hungerGain),
-          happiness: Math.min(100, prev.happiness + food.happinessGain),
-          health: Math.min(100, prev.health + food.healthGain),
-        };
-        onNeedsChange?.(next);
-        return next;
-      });
+      if (!zenModeRef.current) {
+        setNeeds((prev) => {
+          const next = {
+            ...prev,
+            hunger: disabledStatsRef.current.hunger
+              ? 100
+              : Math.min(100, prev.hunger + food.hungerGain),
+            happiness: disabledStatsRef.current.happiness
+              ? 100
+              : Math.min(100, prev.happiness + food.happinessGain),
+            health: disabledStatsRef.current.health
+              ? 100
+              : Math.min(100, prev.health + food.healthGain),
+          };
+          onNeedsChange?.(next);
+          return next;
+        });
+      }
     },
     [changeBehavior, triggerEmote, spawnParticles, onNeedsChange]
   );
 
-  /**
-   * Уложить спать / Разбудить
-   */
   const toggleSleep = useCallback(() => {
     if (behaviorRef.current === HamsterBehavior.SLEEP) {
-      // Разбудить
       changeBehavior(HamsterBehavior.IDLE);
       soundManager.playClickSound();
     } else {
-      // Уложить спать
       changeBehavior(HamsterBehavior.SLEEP, 9999);
     }
   }, [changeBehavior]);
 
-  /**
-   * Убрать какашку кликом игрока (+гигиена, +счастье, звук блеска)
-   */
   const cleanPoop = useCallback(
     (poopId: string) => {
       const target = poopsRef.current.find((p) => p.id === poopId);
@@ -251,162 +263,135 @@ export function useHamsterBrain({
       setPoops(nextPoops);
       onPoopsChange?.(nextPoops);
 
-      setNeeds((prev) => {
-        const next = {
-          ...prev,
-          hygiene: Math.min(100, prev.hygiene + 20),
-          happiness: Math.min(100, prev.happiness + 8),
-        };
-        onNeedsChange?.(next);
-        return next;
-      });
-    },
-    [spawnParticles, onPoopsChange, onNeedsChange]
-  );
-
-  /**
-   * Главный фиксированный тик логики и физики (вызывается из useGameLoop с FIXED_TIMESTEP)
-   */
-  const fixedUpdate = useCallback(
-    (dt: number) => {
-      stateTimeRef.current += dt;
-      const currentBehavior = behaviorRef.current;
-      const currentNeeds = needsRef.current;
-
-      // 1. Расчет физиологических таймеров:
-      hungerTimerRef.current += dt;
-      if (hungerTimerRef.current >= 25) {
-        hungerTimerRef.current = 0;
+      if (!zenModeRef.current) {
         setNeeds((prev) => {
-          const next = { ...prev, hunger: Math.max(0, prev.hunger - 1) };
+          const next = {
+            ...prev,
+            hygiene: disabledStatsRef.current.hygiene
+              ? 100
+              : Math.min(100, prev.hygiene + 20),
+            happiness: disabledStatsRef.current.happiness
+              ? 100
+              : Math.min(100, prev.happiness + 8),
+          };
           onNeedsChange?.(next);
           return next;
         });
       }
+    },
+    [spawnParticles, onPoopsChange, onNeedsChange]
+  );
 
-      energyTimerRef.current += dt;
-      if (currentBehavior === HamsterBehavior.SLEEP) {
-        // Во сне восстанавливает энергию: +1 каждые 5 сек
-        if (energyTimerRef.current >= 5) {
-          energyTimerRef.current = 0;
-          setNeeds((prev) => {
-            const next = { ...prev, energy: Math.min(100, prev.energy + 1) };
-            if (next.energy >= 100) {
-              // Автоматически просыпается, когда полон сил
-              changeBehavior(HamsterBehavior.IDLE);
-              soundManager.playSuccessJingle();
-            }
-            onNeedsChange?.(next);
-            return next;
-          });
+  const fixedUpdate = useCallback(
+    (dt: number) => {
+      stateTimeRef.current += dt;
+      const currentBehavior = behaviorRef.current;
+      const isZen = zenModeRef.current;
+      const disabled = disabledStatsRef.current;
+
+      // 1. Физиологические таймеры (только если Дзен выключен)
+      if (!isZen) {
+        if (!disabled.hunger) {
+          hungerTimerRef.current += dt;
+          if (hungerTimerRef.current >= 25) {
+            hungerTimerRef.current = 0;
+            setNeeds((prev) => {
+              const next = { ...prev, hunger: Math.max(0, prev.hunger - 1) };
+              onNeedsChange?.(next);
+              return next;
+            });
+          }
         }
 
-        // Пузыри "Zzz" во время сна
+        if (!disabled.energy) {
+          energyTimerRef.current += dt;
+          if (currentBehavior === HamsterBehavior.SLEEP) {
+            if (energyTimerRef.current >= 5) {
+              energyTimerRef.current = 0;
+              setNeeds((prev) => {
+                const next = { ...prev, energy: Math.min(100, prev.energy + 1) };
+                if (next.energy >= 100) {
+                  changeBehavior(HamsterBehavior.IDLE);
+                  soundManager.playSuccessJingle();
+                }
+                onNeedsChange?.(next);
+                return next;
+              });
+            }
+          } else {
+            if (energyTimerRef.current >= 35) {
+              energyTimerRef.current = 0;
+              setNeeds((prev) => {
+                const next = { ...prev, energy: Math.max(0, prev.energy - 1) };
+                onNeedsChange?.(next);
+                return next;
+              });
+            }
+          }
+        }
+
+        if (!disabled.hygiene) {
+          hygieneTimerRef.current += dt;
+          if (hygieneTimerRef.current >= 40) {
+            hygieneTimerRef.current = 0;
+            setNeeds((prev) => {
+              const next = { ...prev, hygiene: Math.max(0, prev.hygiene - 1) };
+              onNeedsChange?.(next);
+              return next;
+            });
+          }
+        }
+
+        if (!disabled.health) {
+          healthTimerRef.current += dt;
+          if (healthTimerRef.current >= 15) {
+            healthTimerRef.current = 0;
+            if (needsRef.current.hunger <= 0 || needsRef.current.hygiene <= 0) {
+              triggerEmote('⚠️');
+              setNeeds((prev) => {
+                const next = { ...prev, health: Math.max(0, prev.health - 2) };
+                onNeedsChange?.(next);
+                return next;
+              });
+            }
+          }
+        }
+      }
+
+      // Пузырьки сна
+      if (currentBehavior === HamsterBehavior.SLEEP) {
         sleepZzzTimerRef.current += dt;
         if (sleepZzzTimerRef.current >= 3.5) {
           sleepZzzTimerRef.current = 0;
           triggerEmote('💤');
         }
-      } else {
-        // Во время бодрствования теряет энергию: -1 каждые 35 сек
-        if (energyTimerRef.current >= 35) {
-          energyTimerRef.current = 0;
-          setNeeds((prev) => {
-            const next = { ...prev, energy: Math.max(0, prev.energy - 1) };
-            onNeedsChange?.(next);
-            return next;
-          });
+      }
+
+      // Стрекотание колеса во время бега
+      if (currentBehavior === HamsterBehavior.WHEEL) {
+        wheelSoundTimerRef.current += dt;
+        if (wheelSoundTimerRef.current >= 0.4) {
+          wheelSoundTimerRef.current = 0;
+          soundManager.playWheelSound();
         }
       }
 
-      hygieneTimerRef.current += dt;
-      if (hygieneTimerRef.current >= 40) {
-        hygieneTimerRef.current = 0;
-        setNeeds((prev) => {
-          const next = { ...prev, hygiene: Math.max(0, prev.hygiene - 1) };
-          onNeedsChange?.(next);
-          return next;
-        });
-      }
-
-      // Здоровье: если голод или гигиена на нуле — теряем здоровье
-      healthTimerRef.current += dt;
-      if (healthTimerRef.current >= 15) {
-        healthTimerRef.current = 0;
-        if (currentNeeds.hunger <= 0 || currentNeeds.hygiene <= 0) {
-          triggerEmote('⚠️');
-          setNeeds((prev) => {
-            const next = { ...prev, health: Math.max(0, prev.health - 2) };
-            onNeedsChange?.(next);
-            return next;
-          });
-        }
-      }
-
-      // 2. Логика движения и анимации в состояниях:
+      // 2. Движение при ходьбе по широкой клетке
       if (currentBehavior === HamsterBehavior.WALK) {
         const dx = posRef.current.targetX - posRef.current.x;
-        const walkSpeed = 28; // пикселей в секунду
+        const walkSpeed = 32;
 
         if (Math.abs(dx) > 2) {
           const step = Math.sign(dx) * walkSpeed * dt;
           posRef.current.x += step;
           posRef.current.flipX = dx < 0;
         } else {
-          // Достиг цели — переходим в отдых
-          changeBehavior(Math.random() > 0.4 ? HamsterBehavior.IDLE : HamsterBehavior.LAYING);
-        }
-      }
-
-      // 3. Завершение временных состояний (EATING, POOPING):
-      if (
-        currentBehavior === HamsterBehavior.EATING &&
-        stateTimeRef.current >= stateDurationRef.current
-      ) {
-        changeBehavior(HamsterBehavior.IDLE);
-      }
-
-      if (
-        currentBehavior === HamsterBehavior.POOPING &&
-        stateTimeRef.current >= stateDurationRef.current
-      ) {
-        // Оставляем какашку в точке нахождения хомяка
-        const newPoop: PoopItem = {
-          id: `poop_${Date.now()}`,
-          x: Math.floor(posRef.current.x + 10),
-          y: Math.floor(posRef.current.y + 24),
-          createdAt: Date.now(),
-        };
-        const updatedPoops = [...poopsRef.current, newPoop];
-        poopsRef.current = updatedPoops;
-        setPoops(updatedPoops);
-        onPoopsChange?.(updatedPoops);
-
-        // Снижаем гигиену
-        setNeeds((prev) => {
-          const next = { ...prev, hygiene: Math.max(0, prev.hygiene - 15) };
-          onNeedsChange?.(next);
-          return next;
-        });
-
-        changeBehavior(HamsterBehavior.IDLE);
-      }
-
-      // 4. Смена состояний по истечении времени в IDLE / LAYING:
-      if (
-        (currentBehavior === HamsterBehavior.IDLE || currentBehavior === HamsterBehavior.LAYING) &&
-        stateTimeRef.current >= stateDurationRef.current
-      ) {
-        // Проверка физиологических приоритетов:
-        if (currentNeeds.energy < 20) {
-          changeBehavior(HamsterBehavior.SLEEP);
-        } else if (currentNeeds.hygiene < 35 && poopsRef.current.length < 6) {
-          changeBehavior(HamsterBehavior.POOPING, 2.5);
-        } else {
-          // Случайный выбор следующего занятия
+          // Выбор следующего действия после прогулки
           const roll = Math.random();
-          if (roll < 0.5) {
-            changeBehavior(HamsterBehavior.WALK);
+          if (roll < 0.3) {
+            changeBehavior(HamsterBehavior.SNIFF, 3);
+          } else if (roll < 0.6) {
+            changeBehavior(HamsterBehavior.GROOM, 3);
           } else if (roll < 0.8) {
             changeBehavior(HamsterBehavior.IDLE);
           } else {
@@ -415,7 +400,76 @@ export function useHamsterBrain({
         }
       }
 
-      // 5. Физика частиц
+      // 3. Завершение временных состояний:
+      if (
+        (currentBehavior === HamsterBehavior.EATING ||
+          currentBehavior === HamsterBehavior.GROOM ||
+          currentBehavior === HamsterBehavior.SNIFF ||
+          currentBehavior === HamsterBehavior.WHEEL) &&
+        stateTimeRef.current >= stateDurationRef.current
+      ) {
+        changeBehavior(HamsterBehavior.IDLE);
+      }
+
+      // 4. Появление какашки (только если не Дзен и гигиена включена)
+      if (
+        currentBehavior === HamsterBehavior.POOPING &&
+        stateTimeRef.current >= stateDurationRef.current
+      ) {
+        if (!isZen && !disabled.hygiene) {
+          const newPoop: PoopItem = {
+            id: `poop_${Date.now()}`,
+            x: Math.floor(posRef.current.x + 10),
+            y: 154,
+            createdAt: Date.now(),
+          };
+          const updatedPoops = [...poopsRef.current, newPoop];
+          poopsRef.current = updatedPoops;
+          setPoops(updatedPoops);
+          onPoopsChange?.(updatedPoops);
+
+          setNeeds((prev) => {
+            const next = { ...prev, hygiene: Math.max(0, prev.hygiene - 15) };
+            onNeedsChange?.(next);
+            return next;
+          });
+        }
+        changeBehavior(HamsterBehavior.IDLE);
+      }
+
+      // 5. Переходы из IDLE и LAYING
+      if (
+        (currentBehavior === HamsterBehavior.IDLE ||
+          currentBehavior === HamsterBehavior.LAYING) &&
+        stateTimeRef.current >= stateDurationRef.current
+      ) {
+        if (!isZen && !disabled.energy && needsRef.current.energy < 20) {
+          changeBehavior(HamsterBehavior.SLEEP);
+        } else if (
+          !isZen &&
+          !disabled.hygiene &&
+          needsRef.current.hygiene < 35 &&
+          poopsRef.current.length < 5
+        ) {
+          changeBehavior(HamsterBehavior.POOPING, 2.5);
+        } else {
+          // Случайное поведение хомяка в клетке
+          const roll = Math.random();
+          if (roll < 0.35) {
+            changeBehavior(HamsterBehavior.WALK);
+          } else if (roll < 0.55) {
+            changeBehavior(HamsterBehavior.WHEEL, 5 + Math.random() * 4);
+          } else if (roll < 0.7) {
+            changeBehavior(HamsterBehavior.GROOM, 3 + Math.random() * 2);
+          } else if (roll < 0.85) {
+            changeBehavior(HamsterBehavior.SNIFF, 2.5 + Math.random() * 2);
+          } else {
+            changeBehavior(HamsterBehavior.LAYING, 4 + Math.random() * 3);
+          }
+        }
+      }
+
+      // 6. Частицы
       setParticles((prev) =>
         prev
           .map((p) => ({
@@ -427,7 +481,7 @@ export function useHamsterBrain({
           .filter((p) => p.life < p.maxLife)
       );
 
-      // 6. Плавное всплывание и угасание спич-бабблов
+      // 7. Спич-бабблы
       setEmotes((prev) =>
         prev
           .map((e) => {
@@ -455,6 +509,7 @@ export function useHamsterBrain({
     stateTimeRef,
     fixedUpdate,
     changeBehavior,
+    goToWheel,
     pet,
     feed,
     toggleSleep,

@@ -1,25 +1,6 @@
 /**
  * ============================================================================
- * ГЛАВНЫЙ ЭКРАН: app/page.tsx (Координатор Игровой Системы и UI)
- * ============================================================================
- * 
- * 🎓 ИНТЕРАКТИВНЫЙ УЧЕБНИК: АРХИТЕКТУРНОЕ ОБОСНОВАНИЕ
- * ----------------------------------------------------------------------------
- * 1. ЗАЧЕМ ЭТО НУЖНО (Architectural Reason):
- *    Паттерн "Координатор" (Orchestrator Pattern).
- *    Главный экран связывает воедино 4 ключевых слоя приложения:
- *    - Слой хранения (`useSafeStorage`): SSR-безопасный localStorage с оффлайн-дельтой.
- *    - Слой логики и ИИ (`useHamsterBrain`): конечный автомат (FSM), потребности, физика.
- *    - Слой игрового цикла (`useGameLoop`): requestAnimationFrame с фиксированным шагом физики.
- *    - Слой представления (`CageCanvas`, `StatsOverlay`, модальные окна).
- * 
- * 2. ЗАЩИТА ОТ ГИДРАТАЦИИ В NEXT.JS APP ROUTER:
- *    Пока `isHydrated === false`, компонент рендерит лаконичный ретро-лоадер "ЗАГРУЗКА...".
- *    Это на 100% исключает рассинхронизацию между HTML сервера и клиента.
- * 
- * 3. ПОДВОДНЫЕ КАМНИ (Pitfalls & Memory Safety):
- *    Все обработчики действий и синхронизации стейтов стабилизированы через `useCallback`
- *    и ссылки `useRef`, что исключает утечки слушателей событий и лишние ререндеры.
+ * ГЛАВНЫЙ ЭКРАН: app/page.tsx (Координатор Панорамной Игры и Дзен-Режима)
  * ============================================================================
  */
 
@@ -43,11 +24,11 @@ import {
   FoodItem,
   FurnitureConfig,
   CustomSpriteData,
+  DisabledStatsConfig,
 } from '@/types/hamster';
 import { soundManager } from '@/utils/soundEffects';
 
 export default function TamagotchiPage() {
-  // 1. Слой безопасного хранилища
   const {
     data,
     setData,
@@ -57,16 +38,12 @@ export default function TamagotchiPage() {
     resetSaveData,
   } = useSafeStorage();
 
-  // Состояние открытых модальных окон
   const [isFeedModalOpen, setIsFeedModalOpen] = useState<boolean>(false);
   const [isFurnitureModalOpen, setIsFurnitureModalOpen] = useState<boolean>(false);
   const [isPixelEditorOpen, setIsPixelEditorOpen] = useState<boolean>(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState<boolean>(false);
-
-  // Возраст питомца в секундах
   const [ageSeconds, setAgeSeconds] = useState<number>(data.totalAgeSeconds);
 
-  // 2. Слой ИИ и стейт-машины хомячка
   const {
     behavior,
     needs,
@@ -77,6 +54,7 @@ export default function TamagotchiPage() {
     stateTimeRef,
     fixedUpdate,
     changeBehavior,
+    goToWheel,
     pet,
     feed,
     toggleSleep,
@@ -87,6 +65,8 @@ export default function TamagotchiPage() {
     initialNeeds: data.needs,
     initialBehavior: data.behavior,
     initialPoops: data.poops,
+    zenMode: data.zenMode,
+    disabledStats: data.disabledStats,
     onNeedsChange: (updatedNeeds) => {
       setData((prev) => ({ ...prev, needs: updatedNeeds }));
     },
@@ -98,7 +78,6 @@ export default function TamagotchiPage() {
     },
   });
 
-  // Синхронизация данных при первом считывании из localStorage
   useEffect(() => {
     if (isHydrated) {
       setNeeds(data.needs);
@@ -109,7 +88,6 @@ export default function TamagotchiPage() {
     }
   }, [isHydrated, data.needs, data.poops, data.totalAgeSeconds, data.soundEnabled, data.soundVolume, setNeeds, setPoops]);
 
-  // Таймер взросления питомца (+1 секунда)
   useEffect(() => {
     if (!isHydrated) return;
     const interval = setInterval(() => {
@@ -122,27 +100,19 @@ export default function TamagotchiPage() {
     return () => clearInterval(interval);
   }, [isHydrated, setData]);
 
-  // 3. Слой игрового цикла (Fixed Update 60 FPS)
   useGameLoop({
     onFixedUpdate: fixedUpdate,
-    onRender: () => {
-      // Рендеринг непрерывно управляется CageCanvas
-    },
+    onRender: () => {},
     isActive: isHydrated,
   });
 
-  // Текущая палитра хомяка
   const currentPalette: HamsterPalette =
     HAMSTER_PALETTES.find((p) => p.id === data.paletteId) ||
     HAMSTER_PALETTES[0];
 
-  /**
-   * Кормление выбранным продуктом
-   */
   const handleSelectFood = useCallback(
     (food: FoodItem) => {
       feed(food);
-      // Наполняем кормушку на Canvas
       setData((prev) => ({
         ...prev,
         furniture: {
@@ -155,17 +125,11 @@ export default function TamagotchiPage() {
     [feed, setData]
   );
 
-  /**
-   * Уборка всех какашек сразу по кнопке тулбара
-   */
   const handleCleanAllPoops = useCallback(() => {
     if (poops.length === 0) return;
     poops.forEach((p) => cleanPoop(p.id));
   }, [poops, cleanPoop]);
 
-  /**
-   * Завершение первого онбординга
-   */
   const handleOnboardingComplete = useCallback(
     (name: string, paletteId: string) => {
       setData((prev) => ({
@@ -178,9 +142,6 @@ export default function TamagotchiPage() {
     [setData]
   );
 
-  /**
-   * Применение кастомного пиксель-арт скина
-   */
   const handleApplyCustomSprite = useCallback(
     (customSprite: CustomSpriteData) => {
       setData((prev) => ({
@@ -191,9 +152,6 @@ export default function TamagotchiPage() {
     [setData]
   );
 
-  /**
-   * Сброс кастомного скина
-   */
   const handleResetToDefaultSkin = useCallback(() => {
     setData((prev) => ({
       ...prev,
@@ -201,9 +159,6 @@ export default function TamagotchiPage() {
     }));
   }, [setData]);
 
-  /**
-   * Сохранение новой мебели
-   */
   const handleSaveFurniture = useCallback(
     (newFurniture: FurnitureConfig) => {
       setData((prev) => ({
@@ -214,15 +169,29 @@ export default function TamagotchiPage() {
     [setData]
   );
 
-  /**
-   * Сохранение настроек
-   */
+  const handleToggleZenMode = useCallback(() => {
+    setData((prev) => {
+      const nextZen = !prev.zenMode;
+      if (nextZen) {
+        soundManager.playSuccessJingle();
+      } else {
+        soundManager.playClickSound();
+      }
+      return {
+        ...prev,
+        zenMode: nextZen,
+      };
+    });
+  }, [setData]);
+
   const handleUpdateSettings = useCallback(
     (params: {
       petName: string;
       paletteId: string;
       soundEnabled: boolean;
       soundVolume: number;
+      zenMode: boolean;
+      disabledStats: DisabledStatsConfig;
     }) => {
       setData((prev) => ({
         ...prev,
@@ -230,12 +199,13 @@ export default function TamagotchiPage() {
         paletteId: params.paletteId,
         soundEnabled: params.soundEnabled,
         soundVolume: params.soundVolume,
+        zenMode: params.zenMode,
+        disabledStats: params.disabledStats,
       }));
     },
     [setData]
   );
 
-  // Экран загрузки (защита от несовпадения верстки SSR)
   if (!isHydrated) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 font-pixel text-center">
@@ -247,28 +217,31 @@ export default function TamagotchiPage() {
   }
 
   return (
-    <main className="w-full max-w-3xl flex flex-col items-center">
-      {/* Шапка заголовка */}
-      <header className="text-center mb-3">
+    <main className="w-full max-w-4xl flex flex-col items-center">
+      {/* Шапка */}
+      <header className="text-center mb-2.5">
         <h1 className="text-sm sm:text-lg text-retro-yellow font-pixel tracking-wider drop-shadow-[2px_2px_0px_#000]">
           🐹 ПИКСЕЛЬНЫЙ ТАМАГОЧИ: ХОМЯЧОК
         </h1>
-        <p className="text-[8px] sm:text-[9px] text-retro-cyan font-pixel mt-1 opacity-90">
-          Next.js 14 App Router • Canvas 2D • 8-Bit Web Audio • Pixel Studio
+        <p className="text-[7px] sm:text-[8px] text-retro-cyan font-pixel mt-1 opacity-90">
+          Панорамный экран 480x180 • Беговое колесо • 2x Детализация • Дзен-компаньон
         </p>
       </header>
 
-      {/* Ретро-монитор / Корпус консоли */}
-      <div className="w-full bg-[#3a4466] border-4 border-[#181425] p-3 sm:p-5 rounded-2xl shadow-pixel-lg">
-        {/* Верхняя панель статов (HUD) */}
+      {/* Корпус ретро-консоли */}
+      <div className="w-full bg-[#3a4466] border-4 border-[#181425] p-2.5 sm:p-4 rounded-2xl shadow-pixel-lg">
+        {/* HUD Статов */}
         <StatsOverlay
           petName={data.petName}
           needs={needs}
           behavior={behavior}
           ageSeconds={ageSeconds}
+          zenMode={data.zenMode}
+          disabledStats={data.disabledStats}
+          onToggleZenMode={handleToggleZenMode}
         />
 
-        {/* Главный игровой экран Canvas 2D */}
+        {/* Главный панорамный Canvas 480x180 */}
         <CageCanvas
           palette={currentPalette}
           customSprite={data.customSprite}
@@ -281,6 +254,7 @@ export default function TamagotchiPage() {
           stateTimeRef={stateTimeRef}
           onPet={pet}
           onCleanPoop={cleanPoop}
+          onTapWheel={goToWheel}
           onTapBowl={() => setIsFeedModalOpen(true)}
           onTapBottle={() => {
             soundManager.playPetSound();
@@ -288,12 +262,14 @@ export default function TamagotchiPage() {
           }}
         />
 
-        {/* Нижняя панель действий */}
+        {/* Панель действий */}
         <ActionToolbar
           behavior={behavior}
           poopCount={poops.length}
+          zenMode={data.zenMode}
           onOpenFeedModal={() => setIsFeedModalOpen(true)}
           onPet={pet}
+          onGoToWheel={goToWheel}
           onToggleSleep={toggleSleep}
           onCleanAllPoops={handleCleanAllPoops}
           onOpenFurnitureModal={() => setIsFurnitureModalOpen(true)}
@@ -302,20 +278,18 @@ export default function TamagotchiPage() {
         />
       </div>
 
-      {/* Модальное окно первого онбординга (если еще не пройден) */}
+      {/* Модальные окна */}
       <OnboardingModal
         isOpen={!data.isOnboarded}
         onComplete={handleOnboardingComplete}
       />
 
-      {/* Меню кормления */}
       <FoodMenuModal
         isOpen={isFeedModalOpen}
         onClose={() => setIsFeedModalOpen(false)}
         onSelectFood={handleSelectFood}
       />
 
-      {/* Кастомизация мебели */}
       <FurnitureModal
         isOpen={isFurnitureModalOpen}
         onClose={() => setIsFurnitureModalOpen(false)}
@@ -323,7 +297,6 @@ export default function TamagotchiPage() {
         onSaveFurniture={handleSaveFurniture}
       />
 
-      {/* Встроенная студия пиксель-арта */}
       <PixelEditor
         isOpen={isPixelEditorOpen}
         onClose={() => setIsPixelEditorOpen(false)}
@@ -332,7 +305,6 @@ export default function TamagotchiPage() {
         initialCustomSprite={data.customSprite}
       />
 
-      {/* Настройки игры и звука */}
       <SettingsModal
         isOpen={isSettingsModalOpen}
         onClose={() => setIsSettingsModalOpen(false)}
@@ -340,15 +312,17 @@ export default function TamagotchiPage() {
         currentPaletteId={data.paletteId}
         soundEnabled={data.soundEnabled}
         soundVolume={data.soundVolume}
+        zenMode={data.zenMode}
+        disabledStats={data.disabledStats}
         onUpdateSettings={handleUpdateSettings}
         onResetProgress={resetSaveData}
       />
 
-      {/* Всплывающее уведомление об оффлайн-прогрессе */}
+      {/* Оффлайн отчет */}
       {offlineReport && (
         <div className="fixed bottom-4 right-4 z-40 max-w-sm bg-retro-dark border-4 border-retro-yellow p-4 rounded-lg shadow-pixel text-white font-pixel animate-fadeIn select-none">
           <div className="flex justify-between items-start mb-2">
-            <h4 className="text-xs text-retro-yellow">💤 ПОКА ТЕБЯ НЕ БЫЛО</h4>
+            <h4 className="text-xs text-retro-yellow">💤 С ВОЗВРАЩЕНИЕМ!</h4>
             <button
               onClick={clearOfflineReport}
               className="text-xs text-retro-grey hover:text-white"
@@ -357,22 +331,22 @@ export default function TamagotchiPage() {
             </button>
           </div>
           <p className="text-[9px] text-retro-white leading-relaxed mb-2">
-            Прошло {Math.floor(offlineReport.deltaSeconds / 60)} мин. Хомячок скучал!
+            Прошло {Math.floor(offlineReport.deltaSeconds / 60)} мин. Хомячок сладко спал в клетке!
           </p>
           <ul className="text-[8px] text-retro-grey space-y-1 mb-3">
-            <li>• Потеряно сытости: -{offlineReport.hungerLost}%</li>
+            <li>• Изменение сытости: -{offlineReport.hungerLost}%</li>
             <li>• Изменение энергии: {offlineReport.energyChange}%</li>
             <li>• Снижение чистоты: -{offlineReport.hygieneLost}%</li>
             {offlineReport.newPoopsCount > 0 && (
               <li className="text-yellow-400">• Появилось какашек: +{offlineReport.newPoopsCount}</li>
             )}
-            <li className="text-retro-green">• Soft-cap спас питомца от гибели!</li>
+            <li className="text-retro-green">• Soft-cap спас питомца!</li>
           </ul>
           <button
             onClick={clearOfflineReport}
             className="w-full py-1.5 bg-retro-green hover:brightness-110 text-black text-[9px] font-bold rounded border border-black"
           >
-            Позаботиться о нем!
+            Погладить хомяка ❤️
           </button>
         </div>
       )}

@@ -1,42 +1,37 @@
 /**
  * ============================================================================
- * МОДУЛЬ: 20 ДИЗАЙНЕРСКИХ ПАЛИТР И СПРАЙТОВЫЕ МАТРИЦЫ ХОМЯЧКА
+ * МОДУЛЬ: 20 ДИЗАЙНЕРСКИХ ПАЛИТР И ВЫСОКОДЕТАЛИЗИРОВАННЫЕ СПРАЙТЫ (24x24)
  * ============================================================================
  * 
- * 🎓 ИНТЕРАКТИВНЫЙ УЧЕБНИК: АРХИТЕКТУРНОЕ ОБОСНОВАНИЕ
+ * 🎓 ИНТЕРАКТИВНЫЙ УЧЕБНИК: 2X ДЕТАЛИЗАЦИЯ И МАТРИЧНАЯ АНИМАЦИЯ
  * ----------------------------------------------------------------------------
  * 1. ЗАЧЕМ ЭТО НУЖНО (Architectural Reason):
- *    Вместо растровых картинок (PNG/GIF) мы описываем хомяка в виде цифровых
- *    матриц (2D-массивов с индексами анатомических зон).
- *    Это дает колоссальные преимущества:
- *    - Разделение геометрии и окраса (Data-Driven Palette Swapping):
- *      Одна и та же анимация 16x16 мгновенно перекрашивается в любую из 20 палитр
- *      без необходимости перерисовывать сотни отдельных картинок!
- *    - 100% совместимость со студией пиксель-арта:
- *      Игрок может отредактировать матрицу прямо в игре и сразу надеть на хомячка.
+ *    Переход с 16x16 на 24x24 пикселя дает в 2.25 раза больше площади для детализации!
+ *    Это позволяет нарисовать:
+ *    - Пышную шерстку с трехтоновым затенением (furLight, fur, furDark).
+ *    - Детализированные ушки с розовой внутренней раковиной.
+ *    - Выразительные глаза с двойным искрящимся бликом.
+ *    - Прорисованные усики ('W'), румянец на щечках ('C') и лапки с пальчиками ('P').
  * 
- * 2. КАК ЭТО РАБОТАЕТ (Algorithmic Essence):
- *    Символьные коды анатомических слоев в матрице:
- *    '.' = Прозрачный фон (Alpha 0)
+ * 2. СИМВОЛЬНЫЕ КОДЫ СЛОЕВ (24x24 Matrix Format):
+ *    '.' = Прозрачный фон
  *    'F' = Основная шерсть (Fur)
- *    'D' = Теневая шерсть / контур (Fur Dark)
- *    'B' = Светлое брюшко и щечки (Belly)
- *    'P' = Розовый носик, ушки и лапки (Pink)
- *    'E' = Черные глазки-бусинки (Eyes)
- *    'H' = Блик в глазках (Eye Highlight)
- *    'C' = Румянец на щечках (Cheeks)
- *    'S' = Семечка / еда в лапках (Seed/Food)
- * 
- * 3. ПОДВОДНЫЕ КАМНИ (Pitfalls & Gotchas):
- *    - Строки фиксированной ширины: все строки матрицы обязаны иметь строго одинаковую длину (16 символов).
- *      Если длина строки будет плавать, Canvas отрисует перекошенный спрайт со смещением пикселей.
+ *    'D' = Тень и контур шерсти (Fur Dark)
+ *    'L' = Блик и светлый мех (Fur Light)
+ *    'B' = Светлое шелковистое брюшко (Belly)
+ *    'P' = Розовые ушки, носик и лапки (Pink)
+ *    'E' = Черные глазки (Eyes)
+ *    'H' = Блик в глазах (Eye Highlight)
+ *    'C' = Румяные щечки (Cheeks Blush)
+ *    'W' = Усики (Whiskers)
+ *    'S' = Семечка / угощение в лапках (Seed/Food)
  * ============================================================================
  */
 
 import { HamsterPalette, FoodItem } from '@/types/hamster';
 
 /**
- * 20 Готовых дизайнерских палитр хомячков
+ * 20 Готовых дизайнерских палитр с трехтоновым затенением меха
  */
 export const HAMSTER_PALETTES: HamsterPalette[] = [
   {
@@ -45,7 +40,8 @@ export const HAMSTER_PALETTES: HamsterPalette[] = [
     nameEn: 'Classic Golden',
     description: 'Классический пушистый золотисто-рыжий окрас со светлым животиком.',
     fur: '#e69138',
-    furDark: '#b45f06',
+    furDark: '#994d00',
+    furLight: '#ffb366',
     belly: '#fff2cc',
     pink: '#f4cccc',
     eyes: '#1b1b1b',
@@ -58,8 +54,9 @@ export const HAMSTER_PALETTES: HamsterPalette[] = [
     name: 'Песочный Роборовского',
     nameEn: 'Roborovski Sand',
     description: 'Нежный песочно-палевый оттенок крошечного пустынного хомячка.',
-    fur: '#e0b880',
-    furDark: '#af854f',
+    fur: '#dfb77c',
+    furDark: '#99733e',
+    furLight: '#f5d8a8',
     belly: '#fcf6ed',
     pink: '#f8d7da',
     eyes: '#201b15',
@@ -72,9 +69,10 @@ export const HAMSTER_PALETTES: HamsterPalette[] = [
     name: 'Белоснежный альбинос',
     nameEn: 'Albino Snow',
     description: 'Ослепительно белая шубка с редкими рубиново-красными глазками.',
-    fur: '#ffffff',
-    furDark: '#d9d9d9',
-    belly: '#f3f3f3',
+    fur: '#f5f5f5',
+    furDark: '#cccccc',
+    furLight: '#ffffff',
+    belly: '#ffffff',
     pink: '#ffccd5',
     eyes: '#c9184a',
     eyeHighlight: '#ff758f',
@@ -87,7 +85,8 @@ export const HAMSTER_PALETTES: HamsterPalette[] = [
     nameEn: 'Panda Piebald',
     description: 'Контрастный пятнистый окрас с темной маской и белым тельцем.',
     fur: '#2b2d42',
-    furDark: '#1a1b26',
+    furDark: '#141521',
+    furLight: '#4a4e69',
     belly: '#edf2f4',
     pink: '#ffb5a7',
     eyes: '#0d0d0d',
@@ -101,7 +100,8 @@ export const HAMSTER_PALETTES: HamsterPalette[] = [
     nameEn: 'Caramel Cream',
     description: 'Аппетитный мягкий оттенок ириски с кремовым подшерстком.',
     fur: '#c68b59',
-    furDark: '#8f532a',
+    furDark: '#7a451d',
+    furLight: '#e4ae82',
     belly: '#ffe8d6',
     pink: '#f7cad0',
     eyes: '#301b0f',
@@ -115,7 +115,8 @@ export const HAMSTER_PALETTES: HamsterPalette[] = [
     nameEn: 'Charcoal Dark',
     description: 'Загадочный антрацитовый окрас с серебристым отливом.',
     fur: '#3a3a3c',
-    furDark: '#1c1c1e',
+    furDark: '#1a1a1c',
+    furLight: '#5a5a5e',
     belly: '#636366',
     pink: '#d8b4b8',
     eyes: '#000000',
@@ -129,7 +130,8 @@ export const HAMSTER_PALETTES: HamsterPalette[] = [
     nameEn: 'Cinnamon',
     description: 'Пряный коричневато-медный цвет корицы с бежевым брюшком.',
     fur: '#a0522d',
-    furDark: '#6b3311',
+    furDark: '#5e2609',
+    furLight: '#c97548',
     belly: '#f5deb3',
     pink: '#e8b4b8',
     eyes: '#3d1a0a',
@@ -143,7 +145,8 @@ export const HAMSTER_PALETTES: HamsterPalette[] = [
     nameEn: 'Lilac Mist',
     description: 'Благородный пепельно-лавандовый оттенок с мягким градиентом.',
     fur: '#9d8189',
-    furDark: '#6b545a',
+    furDark: '#5c464c',
+    furLight: '#c2adb3',
     belly: '#f4acb7',
     pink: '#ffcad4',
     eyes: '#2e1f27',
@@ -157,7 +160,8 @@ export const HAMSTER_PALETTES: HamsterPalette[] = [
     nameEn: 'Silver Pearl',
     description: 'Светло-серый шелковистый окрас с мерцающей белой грудкой.',
     fur: '#b8c0c8',
-    furDark: '#838e9b',
+    furDark: '#75808d',
+    furLight: '#dde3ea',
     belly: '#f0f4f8',
     pink: '#f9d2dc',
     eyes: '#222831',
@@ -171,7 +175,8 @@ export const HAMSTER_PALETTES: HamsterPalette[] = [
     nameEn: 'Blue Sapphire',
     description: 'Холодный серо-голубой окрас джунгарского хомячка с темной полоской.',
     fur: '#6c7d93',
-    furDark: '#445163',
+    furDark: '#394657',
+    furLight: '#94a5bd',
     belly: '#dce4ec',
     pink: '#e6b8c2',
     eyes: '#1a2530',
@@ -185,7 +190,8 @@ export const HAMSTER_PALETTES: HamsterPalette[] = [
     nameEn: 'Chocolate Brown',
     description: 'Глубокий цвет темного шоколада с аппетитной карамельной грудкой.',
     fur: '#5c3a21',
-    furDark: '#362111',
+    furDark: '#2e1808',
+    furLight: '#855633',
     belly: '#d4a373',
     pink: '#e29578',
     eyes: '#1e0f06',
@@ -199,7 +205,8 @@ export const HAMSTER_PALETTES: HamsterPalette[] = [
     nameEn: 'Argente Red',
     description: 'Яркий персиково-апельсиновый оттенок шерсти с карими глазами.',
     fur: '#e76f51',
-    furDark: '#b84428',
+    furDark: '#99351d',
+    furLight: '#f49d86',
     belly: '#ffe8d6',
     pink: '#f4a261',
     eyes: '#491b1d',
@@ -213,7 +220,8 @@ export const HAMSTER_PALETTES: HamsterPalette[] = [
     nameEn: 'Honey Gold',
     description: 'Теплый солнечный янтарно-желтый цвет летнего меда.',
     fur: '#f4a261',
-    furDark: '#c86d2b',
+    furDark: '#a8571c',
+    furLight: '#ffc594',
     belly: '#fff1d0',
     pink: '#fbc3bc',
     eyes: '#381e05',
@@ -227,7 +235,8 @@ export const HAMSTER_PALETTES: HamsterPalette[] = [
     nameEn: 'Rust Orange',
     description: 'Насыщенный осенний рыжий окрас пушистого зверька.',
     fur: '#d35400',
-    furDark: '#962d00',
+    furDark: '#7a2d00',
+    furLight: '#ff7f2a',
     belly: '#fdebd0',
     pink: '#edbb99',
     eyes: '#2c1200',
@@ -241,7 +250,8 @@ export const HAMSTER_PALETTES: HamsterPalette[] = [
     nameEn: 'Dove Grey',
     description: 'Умиротворяющий матовый дымчатый цвет голубиного пера.',
     fur: '#8d99ae',
-    furDark: '#566375',
+    furDark: '#4a5363',
+    furLight: '#b5c0d3',
     belly: '#edf2f4',
     pink: '#e8b4b8',
     eyes: '#2b2d42',
@@ -255,7 +265,8 @@ export const HAMSTER_PALETTES: HamsterPalette[] = [
     nameEn: 'Mink Soft',
     description: 'Элегантный бежевый цвет шелковой норки с мягким свечением.',
     fur: '#b79ced',
-    furDark: '#7f63b8',
+    furDark: '#6c4baf',
+    furLight: '#d8c7ff',
     belly: '#f3ecff',
     pink: '#f8bbd0',
     eyes: '#281a40',
@@ -269,7 +280,8 @@ export const HAMSTER_PALETTES: HamsterPalette[] = [
     nameEn: 'Copper Glow',
     description: 'Сияющий металлический медно-бронзовый цвет шерстки.',
     fur: '#b85d38',
-    furDark: '#7e3518',
+    furDark: '#692b11',
+    furLight: '#e0835d',
     belly: '#fad3b8',
     pink: '#e69c8a',
     eyes: '#3b160a',
@@ -283,7 +295,8 @@ export const HAMSTER_PALETTES: HamsterPalette[] = [
     nameEn: 'Ivory White',
     description: 'Мягкий благородный сливочно-белый оттенок с темными глазками.',
     fur: '#fefae0',
-    furDark: '#d4ceaa',
+    furDark: '#b8b082',
+    furLight: '#ffffff',
     belly: '#ffffff',
     pink: '#fbc4ab',
     eyes: '#1e1e1e',
@@ -296,8 +309,9 @@ export const HAMSTER_PALETTES: HamsterPalette[] = [
     name: 'Глянцевый оникс',
     nameEn: 'Obsidian Onyx',
     description: 'Смоляной черный мех с элегантными белоснежными перчатками на лапках.',
-    fur: '#141416',
+    fur: '#1a1a1e',
     furDark: '#08080a',
+    furLight: '#3d3d45',
     belly: '#28282e',
     pink: '#ff9ebb',
     eyes: '#000000',
@@ -311,7 +325,8 @@ export const HAMSTER_PALETTES: HamsterPalette[] = [
     nameEn: 'Party Cyber / Neon',
     description: 'Секретный ретро-киберпанк окрас с неоново-бирюзовой шерсткой и фиолетовыми щечками.',
     fur: '#00f5d4',
-    furDark: '#00bbf9',
+    furDark: '#0077b6',
+    furLight: '#70fff0',
     belly: '#fee440',
     pink: '#f15bb5',
     eyes: '#9b5de5',
@@ -322,209 +337,471 @@ export const HAMSTER_PALETTES: HamsterPalette[] = [
 ];
 
 /**
- * 16x16 Символьные матрицы анимаций хомячка.
- * Каждая матрица содержит строго 16 строк по 16 символов.
+ * 24x24 Высокодетализированные матрицы анимаций (2x Detail Sprite Sheets)
  */
 
-// 1. Спокойное сидение / Idle 1
-export const HAMSTER_IDLE_FRAME_1 = [
-  '................',
-  '....DDF..FDD....',
-  '...DPPF..FPPD...',
-  '...DPPF..FPPD...',
-  '..DFFFFFFFFFD...',
-  '..DFEFDFFDFED...',
-  '..DFHFDFFDFHD...',
-  '..DFFFDPDFFFD...',
-  '..DFCFD.DFCFD...',
-  '.DFFFFFFFFFD....',
-  '.DFFBBBBBFFFD...',
-  '.DFFBBBBBFFFD...',
-  '.DFFFFFFFFFD....',
-  '..DFFDFFDFFD....',
-  '...DPPD.DPPD....',
-  '................',
+// 1. Спокойное сидение / IDLE 1 (дыхание, глазки открыты)
+export const HAMSTER_24_IDLE_1 = [
+  '........................',
+  '......DDFFF......FFFDD..',
+  '.....DPPPFFD....DFFPPPD.',
+  '....DPPPFFFFD..DFFFFPPPD',
+  '....DPPFFFFFFDDFFFFFFPPD',
+  '...DFFFFFFFFFFFFFFFFFFD.',
+  '..DFFFFFFFFFFFFFFFFFFFFD',
+  '.DFFFFFFFFFFFFFFFFFFFFFF',
+  '.DFFEEDFFFFFFFFFFFFDEEFD',
+  '.DFFEHDFFFFDPPDFFFFDEHFD',
+  '.DFFFFDFFFFDPPDFFFFDFFFD',
+  '.DFFCFDFFFFFFFFFFFFDCFFD',
+  'W.DFFDFFFFFDPPDFFFFFDFFD',
+  'WW.DFFFFFFFFDPDFFFFFFFFD',
+  'W..DFFLLBBBBBBBBLLFFD...',
+  '...DFFLLBBBBBBBBLLFFD...',
+  '...DFFLLBBBBBBBBLLFFD...',
+  '...DFFFFBBBBBBBBFFFFD...',
+  '....DFFFFFFFFFFDFFFD....',
+  '....DFFDDPPDDFFDDPPD....',
+  '.....DPPPPD...DPPPPD....',
+  '........................',
+  '........................',
+  '........................',
 ];
 
-// 2. Спокойное сидение / Idle 2 (шевелит ушками и носиком)
-export const HAMSTER_IDLE_FRAME_2 = [
-  '................',
-  '...DDF....FDD...',
-  '..DPPF....FPPD..',
-  '..DPPF....FPPD..',
-  '..DFFFFFFFFFD...',
-  '..DFEFDFFDFED...',
-  '..DFHFDFFDFHD...',
-  '..DFFFD.DFFFD...',
-  '..DFCFDPDFCFD...',
-  '.DFFFFFFFFFD....',
-  '.DFFBBBBBFFFD...',
-  '.DFFBBBBBFFFD...',
-  '.DFFFFFFFFFD....',
-  '..DFFDFFDFFD....',
-  '...DPPD.DPPD....',
-  '................',
+// 2. Спокойное сидение / IDLE 2 (моргает, ушки шевелятся, носик приподнят)
+export const HAMSTER_24_IDLE_2 = [
+  '........................',
+  '.....DDFFF........FFFDD.',
+  '....DPPPFFD......DFFPPPD',
+  '....DPPFFFFFFDDFFFFFFPPD',
+  '...DFFFFFFFFFFFFFFFFFFD.',
+  '..DFFFFFFFFFFFFFFFFFFFFD',
+  '.DFFFFFFFFFFFFFFFFFFFFFF',
+  '.DFFFFFFFFFFFFFFFFFFFFFF',
+  '.DFFDDDFFFFFFFFFFFFDDDFD',
+  '.DFFFFDFFFFDPPDFFFFDFFFD',
+  '.DFFCFDFFFFDPPDFFFFDCFFD',
+  'W.DFFDFFFFFDPPDFFFFFDFFD',
+  'WW.DFFFFFFFDPPDFFFFFFFFD',
+  'W..DFFFFFFF.DP.FFFFFFFFD',
+  '...DFFLLBBBBBBBBLLFFD...',
+  '...DFFLLBBBBBBBBLLFFD...',
+  '...DFFLLBBBBBBBBLLFFD...',
+  '...DFFFFBBBBBBBBFFFFD...',
+  '....DFFFFFFFFFFDFFFD....',
+  '....DFFDDPPDDFFDDPPD....',
+  '.....DPPPPD...DPPPPD....',
+  '........................',
+  '........................',
+  '........................',
 ];
 
-// 3. Ходьба / Walk 1 (лапки вперед)
-export const HAMSTER_WALK_FRAME_1 = [
-  '................',
-  '....DDF..FDD....',
-  '...DPPF..FPPD...',
-  '..DFFFFFFFFFD...',
-  '..DFEFDFFDFED...',
-  '..DFHFDFFDFHD...',
-  '..DFFFDPDFFFD...',
-  '..DFCFD.DFCFD...',
-  '.DFFFFFFFFFFFD..',
-  '.DFFBBBBBBFFFD..',
-  '.DFFBBBBBBFFFD..',
-  '.DFFFFFFFFFFFD..',
-  '..DFFD...DFFD...',
-  '.DPPD.....DPPD..',
-  '................',
-  '................',
+// 3. Ходьба 1 / WALK 1 (передняя правая вперед, задняя левая назад)
+export const HAMSTER_24_WALK_1 = [
+  '........................',
+  '......DDFFF......FFFDD..',
+  '.....DPPPFFD....DFFPPPD.',
+  '....DPPFFFFFFDDFFFFFFPPD',
+  '...DFFFFFFFFFFFFFFFFFFD.',
+  '..DFFFFFFFFFFFFFFFFFFFFD',
+  '.DFFFFFFFFFFFFFFFFFFFFFF',
+  '.DFFEEDFFFFFFFFFFFFDEEFD',
+  '.DFFEHDFFFFDPPDFFFFDEHFD',
+  '.DFFCFDFFFFDPPDFFFFDCFFD',
+  'W.DFFDFFFFFDPPDFFFFFDFFD',
+  'WW.DFFFFFFFFDPDFFFFFFFFD',
+  '.DFFLLBBBBBBBBBBLLFFFD..',
+  '.DFFLLBBBBBBBBBBLLFFFD..',
+  '.DFFLLBBBBBBBBBBLLFFFD..',
+  '..DFFFFFFFFFFFFFFFFFFD..',
+  '..DFFFFFFFFFFFFFFFFFFD..',
+  '...DFFD..DFFD..DFFD.....',
+  '..DPPPD...DFFD..DPPPD...',
+  '..DPPD.....DPPD..DPPD...',
+  '........................',
+  '........................',
+  '........................',
+  '........................',
 ];
 
-// 4. Ходьба / Walk 2 (лапки назад)
-export const HAMSTER_WALK_FRAME_2 = [
-  '................',
-  '....DDF..FDD....',
-  '...DPPF..FPPD...',
-  '..DFFFFFFFFFD...',
-  '..DFEFDFFDFED...',
-  '..DFHFDFFDFHD...',
-  '..DFFFDPDFFFD...',
-  '..DFCFD.DFCFD...',
-  '.DFFFFFFFFFFFD..',
-  '.DFFBBBBBBFFFD..',
-  '.DFFBBBBBBFFFD..',
-  '.DFFFFFFFFFFFD..',
-  '...DFFD.DFFD....',
-  '...DPPD.DPPD....',
-  '................',
-  '................',
+// 4. Ходьба 2 / WALK 2 (нейтральная фаза шага)
+export const HAMSTER_24_WALK_2 = [
+  '........................',
+  '......DDFFF......FFFDD..',
+  '.....DPPPFFD....DFFPPPD.',
+  '....DPPFFFFFFDDFFFFFFPPD',
+  '...DFFFFFFFFFFFFFFFFFFD.',
+  '..DFFFFFFFFFFFFFFFFFFFFD',
+  '.DFFFFFFFFFFFFFFFFFFFFFF',
+  '.DFFEEDFFFFFFFFFFFFDEEFD',
+  '.DFFEHDFFFFDPPDFFFFDEHFD',
+  '.DFFCFDFFFFDPPDFFFFDCFFD',
+  'W.DFFDFFFFFDPPDFFFFFDFFD',
+  'WW.DFFFFFFFFDPDFFFFFFFFD',
+  '.DFFLLBBBBBBBBBBLLFFFD..',
+  '.DFFLLBBBBBBBBBBLLFFFD..',
+  '.DFFLLBBBBBBBBBBLLFFFD..',
+  '..DFFFFFFFFFFFFFFFFFFD..',
+  '..DFFFFFFFFFFFFFFFFFFD..',
+  '....DFFD....DFFD........',
+  '....DPPPD..DPPPD........',
+  '.....DPPD...DPPD........',
+  '........................',
+  '........................',
+  '........................',
+  '........................',
 ];
 
-// 5. Лежит на пузике / Laying
-export const HAMSTER_LAYING_FRAME = [
-  '................',
-  '................',
-  '................',
-  '................',
-  '................',
-  '....DDF..FDD....',
-  '..DFFFFFFFFFFD..',
-  '.DFFFFFFFFFFFFD.',
-  '.DFEFDFFDDFEFD..',
-  '.DFCFDPDDDFCFD..',
-  '.DFFFFFFFFFFFFD.',
-  '.DFFBBBBBBFFFD..',
-  '..DPPDFFDDPPD...',
-  '................',
-  '................',
-  '................',
+// 5. Ходьба 3 / WALK 3 (передняя левая вперед, задняя правая назад)
+export const HAMSTER_24_WALK_3 = [
+  '........................',
+  '......DDFFF......FFFDD..',
+  '.....DPPPFFD....DFFPPPD.',
+  '....DPPFFFFFFDDFFFFFFPPD',
+  '...DFFFFFFFFFFFFFFFFFFD.',
+  '..DFFFFFFFFFFFFFFFFFFFFD',
+  '.DFFFFFFFFFFFFFFFFFFFFFF',
+  '.DFFEEDFFFFFFFFFFFFDEEFD',
+  '.DFFEHDFFFFDPPDFFFFDEHFD',
+  '.DFFCFDFFFFDPPDFFFFDCFFD',
+  'W.DFFDFFFFFDPPDFFFFFDFFD',
+  'WW.DFFFFFFFFDPDFFFFFFFFD',
+  '.DFFLLBBBBBBBBBBLLFFFD..',
+  '.DFFLLBBBBBBBBBBLLFFFD..',
+  '.DFFLLBBBBBBBBBBLLFFFD..',
+  '..DFFFFFFFFFFFFFFFFFFD..',
+  '..DFFFFFFFFFFFFFFFFFFD..',
+  '.....DFFD..DFFD..DFFD...',
+  '...DPPPD..DFFD...DPPPD..',
+  '...DPPD..DPPD.....DPPD..',
+  '........................',
+  '........................',
+  '........................',
+  '........................',
 ];
 
-// 6. Спит клубочком / Sleep 1 (выдох)
-export const HAMSTER_SLEEP_FRAME_1 = [
-  '................',
-  '................',
-  '................',
-  '................',
-  '....DDDDDDD.....',
-  '..DDFFFFFFFD....',
-  '.DFFFFFFFFFFD...',
-  '.DFFFFFFFFFFD...',
-  '.DFFFFDFFFFFD...',
-  '.DFFFFDFFFFFD...',
-  '.DFFFFDDPDFFD...',
-  '.DFFFFDDDDFFD...',
-  '..DFFBBBBBFFD...',
-  '...DFFFFFFFFD...',
-  '....DDDDDDD.....',
-  '................',
+// 6. Ходьба 4 / WALK 4 (нейтральная фаза шага 2)
+export const HAMSTER_24_WALK_4 = HAMSTER_24_WALK_2;
+
+// 7. Бег в колесе / WHEEL 1 (галоп, лапки вытянуты)
+export const HAMSTER_24_WHEEL_1 = [
+  '........................',
+  '........................',
+  '.......DDFFF.....FFFDD..',
+  '......DPPPFFD...DFFPPPD.',
+  '.....DPPFFFFFFFFFFFFPPD.',
+  '...DFFFFFFFFFFFFFFFFFFD.',
+  '..DFFEEDFFFFFFFFDEEFD...',
+  '..DFFEHDFFDPPDFFDEHFD...',
+  '..DFFCFDFFDPPDFFDCFFD...',
+  '.DFFFFFFFFFDPDFFFFFFFFD.',
+  '.DFFLLBBBBBBBBBBLLFFFD..',
+  '.DFFLLBBBBBBBBBBLLFFFD..',
+  '..DFFFFFFFFFFFFFFFFFFD..',
+  '..DPPD.DFFD..DFFD.DPPD..',
+  '.DPPPD..DPPD.DPPD..DPPPD',
+  '........................',
+  '........................',
+  '........................',
+  '........................',
+  '........................',
+  '........................',
+  '........................',
+  '........................',
+  '........................',
 ];
 
-// 7. Спит клубочком / Sleep 2 (вдох - приподнялся)
-export const HAMSTER_SLEEP_FRAME_2 = [
-  '................',
-  '................',
-  '................',
-  '....DDDDDDD.....',
-  '..DDFFFFFFFD....',
-  '.DFFFFFFFFFFD...',
-  '.DFFFFFFFFFFD...',
-  '.DFFFFFFFFFFD...',
-  '.DFFFFDFFFFFD...',
-  '.DFFFFDDPDFFD...',
-  '.DFFFFDDDDFFD...',
-  '..DFFBBBBBFFD...',
-  '...DFFFFFFFFD...',
-  '....DDDDDDD.....',
-  '................',
-  '................',
+// 8. Бег в колесе / WHEEL 2 (галоп, лапки собраны под тельцем)
+export const HAMSTER_24_WHEEL_2 = [
+  '........................',
+  '........................',
+  '........................',
+  '.......DDFFF.....FFFDD..',
+  '......DPPPFFD...DFFPPPD.',
+  '.....DPPFFFFFFFFFFFFPPD.',
+  '...DFFFFFFFFFFFFFFFFFFD.',
+  '..DFFEEDFFFFFFFFDEEFD...',
+  '..DFFEHDFFDPPDFFDEHFD...',
+  '..DFFCFDFFDPPDFFDCFFD...',
+  '.DFFFFFFFFFDPDFFFFFFFFD.',
+  '.DFFLLBBBBBBBBBBLLFFFD..',
+  '.DFFLLBBBBBBBBBBLLFFFD..',
+  '..DFFFFFFFFFFFFFFFFFFD..',
+  '....DPPDDFFDFFDDPPD.....',
+  '....DPPPDDPPDDPPPD......',
+  '........................',
+  '........................',
+  '........................',
+  '........................',
+  '........................',
+  '........................',
+  '........................',
+  '........................',
 ];
 
-// 8. Кушает / Eating 1 (надувает щечки с семечкой 'S')
-export const HAMSTER_EATING_FRAME_1 = [
-  '................',
-  '....DDF..FDD....',
-  '...DPPF..FPPD...',
-  '..DFFFFFFFFFD...',
-  '..DFEFDFFDFED...',
-  '..DFHFDFFDFHD...',
-  '.DFFFFDPDFFFFD..',
-  '.DFCCFD.DFCCFD..',
-  '.DFCCFDSSDFCCFD.',
-  '.DFFFFDPPDFFFD..',
-  '.DFFBBBBBBFFFD..',
-  '.DFFFFFFFFFFFD..',
-  '..DFFDFFDFFD....',
-  '...DPPD.DPPD....',
-  '................',
-  '................',
+// 9. Умывание / GROOM 1 (лапки у мордочки)
+export const HAMSTER_24_GROOM_1 = [
+  '........................',
+  '......DDFFF......FFFDD..',
+  '.....DPPPFFD....DFFPPPD.',
+  '....DPPFFFFFFDDFFFFFFPPD',
+  '...DFFFFFFFFFFFFFFFFFFD.',
+  '..DFFFFFFFFFFFFFFFFFFFFD',
+  '.DFFFFFFFFFFFFFFFFFFFFFF',
+  '.DFFDDDFFFFFFFFFFFFDDDFD',
+  '.DFFFFDFFFFDPPDFFFFDFFFD',
+  '.DFFCFDFFDPPPPPDFFFDCFFD',
+  '.DFFCFDFFDPPPPPDFFFDCFFD',
+  '..DFFFFFFFDPPDFFFFFFFFD.',
+  '..DFFLLBBBBBBBBBBLLFFD..',
+  '..DFFLLBBBBBBBBBBLLFFD..',
+  '..DFFFFBBBBBBBBBBFFFFD..',
+  '...DFFFFFFFFFFFFFFFFD...',
+  '....DFFFFFFFFFFDFFFD....',
+  '.....DPPPD....DPPPD.....',
+  '......DPPD....DPPD......',
+  '........................',
+  '........................',
+  '........................',
+  '........................',
+  '........................',
 ];
 
-// 9. Кушает / Eating 2 (жует)
-export const HAMSTER_EATING_FRAME_2 = [
-  '................',
-  '....DDF..FDD....',
-  '...DPPF..FPPD...',
-  '..DFFFFFFFFFD...',
-  '..DFEFDFFDFED...',
-  '..DFHFDFFDFHD...',
-  '.DFFFFDPDFFFFD..',
-  '.DFCCFDSSDFCCFD.',
-  '.DFCCFDDDDCCFD..',
-  '.DFFFFDPPDFFFD..',
-  '.DFFBBBBBBFFFD..',
-  '.DFFFFFFFFFFFD..',
-  '..DFFDFFDFFD....',
-  '...DPPD.DPPD....',
-  '................',
-  '................',
+// 10. Умывание / GROOM 2 (лапки трут ушки)
+export const HAMSTER_24_GROOM_2 = [
+  '........................',
+  '....DPPPDDFFF....FFFDD..',
+  '...DPPPDPPPFFD..DFFPPPD.',
+  '....DPPFFFFFFDDFFFFFFPPD',
+  '...DFFFFFFFFFFFFFFFFFFD.',
+  '..DFFFFFFFFFFFFFFFFFFFFD',
+  '.DFFFFFFFFFFFFFFFFFFFFFF',
+  '.DFFDDDFFFFFFFFFFFFDDDFD',
+  '.DFFFFDFFFFDPPDFFFFDFFFD',
+  '.DFFCFDFFFFDPPDFFFFDCFFD',
+  '.DFFCFDFFFFDPPDFFFFDCFFD',
+  '..DFFFFFFFFDPDFFFFFFFFD.',
+  '..DFFLLBBBBBBBBBBLLFFD..',
+  '..DFFLLBBBBBBBBBBLLFFD..',
+  '..DFFFFBBBBBBBBBBFFFFD..',
+  '...DFFFFFFFFFFFFFFFFD...',
+  '....DFFFFFFFFFFDFFFD....',
+  '.....DPPPD....DPPPD.....',
+  '......DPPD....DPPD......',
+  '........................',
+  '........................',
+  '........................',
+  '........................',
+  '........................',
 ];
 
-// 10. Дефекация / Pooping
-export const HAMSTER_POOPING_FRAME = [
-  '................',
-  '................',
-  '....DDF..FDD....',
-  '...DPPF..FPPD...',
-  '..DFFFFFFFFFD...',
-  '..DFEFDFFDFED...',
-  '..DFHFDFFDFHD...',
-  '..DFFFDPDFFFD...',
-  '..DFCFD.DFCFD...',
-  '.DFFFFFFFFFFD...',
-  '.DFFFFFFFFFFD...',
-  '..DFFFFFFFFD....',
-  '...DFFD..DFFD...',
-  '....DPPD..DPPD..',
-  '................',
-  '................',
+// 11. Обнюхивание / SNIFF (мордочка наклонена к опилкам)
+export const HAMSTER_24_SNIFF_1 = [
+  '........................',
+  '........................',
+  '......DDFFF......FFFDD..',
+  '.....DPPPFFD....DFFPPPD.',
+  '....DPPFFFFFFDDFFFFFFPPD',
+  '...DFFFFFFFFFFFFFFFFFFD.',
+  '..DFFFFFFFFFFFFFFFFFFFFD',
+  '.DFFFFFFFFFFFFFFFFFFFFFF',
+  '.DFFEEDFFFFFFFFFFFFDEEFD',
+  '.DFFEHDFFFFFFFFFFFFDEHFD',
+  '.DFFCFDFFFFFFFFFFFFDCFFD',
+  '..DFFFFFFFFFFFFFFFFFFD..',
+  '..DFFLLBBBBBBBBBBLLFFD..',
+  '..DFFLLBBBBBBBBBBLLFFD..',
+  '..DFFFFDPPDDPPDFFFFFD...',
+  '...DFFFDPPDDPPDFFFFD....',
+  '....DFFFFDDPDFFFFFD.....',
+  '.....DPPPD....DPPPD.....',
+  '........................',
+  '........................',
+  '........................',
+  '........................',
+  '........................',
+  '........................',
 ];
+
+// 12. Еда / EATING 1 (держит зернышко 'S', щеки надуты)
+export const HAMSTER_24_EAT_1 = [
+  '........................',
+  '......DDFFF......FFFDD..',
+  '.....DPPPFFD....DFFPPPD.',
+  '....DPPFFFFFFDDFFFFFFPPD',
+  '...DFFFFFFFFFFFFFFFFFFD.',
+  '..DFFFFFFFFFFFFFFFFFFFFD',
+  '.DFFFFFFFFFFFFFFFFFFFFFF',
+  '.DFFEEDFFFFFFFFFFFFDEEFD',
+  '.DFFEHDFFFFDPPDFFFFDEHFD',
+  'DFFFCCFDFFFDPPDFFFCCFFFD',
+  'DFFFCCFDFFSSSSSSFFCCFFFD',
+  'DFFFCCFDFFSSSSSSFFCCFFFD',
+  '.DFFFFFFDDPPPPPDDFFFFFFD',
+  '..DFFLLBBBBBBBBBBLLFFD..',
+  '..DFFLLBBBBBBBBBBLLFFD..',
+  '..DFFFFBBBBBBBBBBFFFFD..',
+  '...DFFFFFFFFFFFFFFFFD...',
+  '....DFFFFFFFFFFDFFFD....',
+  '.....DPPPD....DPPPD.....',
+  '......DPPD....DPPD......',
+  '........................',
+  '........................',
+  '........................',
+  '........................',
+];
+
+// 13. Еда / EATING 2 (жует, зернышко меньше)
+export const HAMSTER_24_EAT_2 = [
+  '........................',
+  '......DDFFF......FFFDD..',
+  '.....DPPPFFD....DFFPPPD.',
+  '....DPPFFFFFFDDFFFFFFPPD',
+  '...DFFFFFFFFFFFFFFFFFFD.',
+  '..DFFFFFFFFFFFFFFFFFFFFD',
+  '.DFFFFFFFFFFFFFFFFFFFFFF',
+  '.DFFEEDFFFFFFFFFFFFDEEFD',
+  '.DFFEHDFFFFDPPDFFFFDEHFD',
+  'DFFFCCFDFFFDPPDFFFCCFFFD',
+  'DFFFCCFDFF.SSSS.FFCCFFFD',
+  'DFFFCCFDFF.SSSS.FFCCFFFD',
+  '.DFFFFFFDDPPPPPDDFFFFFFD',
+  '..DFFLLBBBBBBBBBBLLFFD..',
+  '..DFFLLBBBBBBBBBBLLFFD..',
+  '..DFFFFBBBBBBBBBBFFFFD..',
+  '...DFFFFFFFFFFFFFFFFD...',
+  '....DFFFFFFFFFFDFFFD....',
+  '.....DPPPD....DPPPD.....',
+  '......DPPD....DPPD......',
+  '........................',
+  '........................',
+  '........................',
+  '........................',
+];
+
+// 14. Сон / SLEEP 1 (клубочек выдох)
+export const HAMSTER_24_SLEEP_1 = [
+  '........................',
+  '........................',
+  '........................',
+  '........................',
+  '........................',
+  '........................',
+  '........DDDDDDDDD.......',
+  '.....DDDFFFFFFFFFDDD....',
+  '...DDFFFFFFFFFFFFFFFDD..',
+  '..DFFFFFFFFFFFFFFFFFFFD.',
+  '.DFFFFFFFFFFFFFFFFFFFFFD',
+  '.DFFFFFFFFFFFFFFFFFFFFFD',
+  '.DFFFFFFFFFFFFFFFFFFFFFD',
+  '.DFFFFFFFFDDPPDFFFFFFFFD',
+  '.DFFFFFFFFDDDDFFFFFFFFFD',
+  '..DFFLLBBBBBBBBBBLLFFFD.',
+  '..DFFLLBBBBBBBBBBLLFFFD.',
+  '...DFFFFFFFFFFFFFFFFFD..',
+  '.....DDDFFFFFFFFFFDDD...',
+  '........DDDDDDDDDD......',
+  '........................',
+  '........................',
+  '........................',
+  '........................',
+];
+
+// 15. Сон / SLEEP 2 (клубочек вдох - чуть приподнят)
+export const HAMSTER_24_SLEEP_2 = [
+  '........................',
+  '........................',
+  '........................',
+  '........................',
+  '........................',
+  '........DDDDDDDDD.......',
+  '.....DDDFFFFFFFFFDDD....',
+  '...DDFFFFFFFFFFFFFFFDD..',
+  '..DFFFFFFFFFFFFFFFFFFFD.',
+  '.DFFFFFFFFFFFFFFFFFFFFFD',
+  '.DFFFFFFFFFFFFFFFFFFFFFD',
+  '.DFFFFFFFFFFFFFFFFFFFFFD',
+  '.DFFFFFFFFFFFFFFFFFFFFFD',
+  '.DFFFFFFFFDDPPDFFFFFFFFD',
+  '.DFFFFFFFFDDDDFFFFFFFFFD',
+  '..DFFLLBBBBBBBBBBLLFFFD.',
+  '..DFFLLBBBBBBBBBBLLFFFD.',
+  '...DFFFFFFFFFFFFFFFFFD..',
+  '.....DDDFFFFFFFFFFDDD...',
+  '........DDDDDDDDDD......',
+  '........................',
+  '........................',
+  '........................',
+  '........................',
+];
+
+// 16. Лежит / LAYING
+export const HAMSTER_24_LAYING = [
+  '........................',
+  '........................',
+  '........................',
+  '........................',
+  '........................',
+  '........................',
+  '........................',
+  '........................',
+  '......DDFFF......FFFDD..',
+  '.....DPPPFFD....DFFPPPD.',
+  '...DFFFFFFFFFFFFFFFFFFD.',
+  '..DFFFFFFFFFFFFFFFFFFFFD',
+  '.DFFEEDFFFFFFFFFFFFDEEFD',
+  '.DFFEHDFFFFDPPDFFFFDEHFD',
+  '.DFFCFDFFFFDPPDFFFFDCFFD',
+  '.DFFFFFFFFFDPDFFFFFFFFFD',
+  '.DFFLLBBBBBBBBBBLLFFFFFD',
+  '..DPPDFFFFFFFFFFDFFDPPD.',
+  '...DPPDDDDDDDDDDDDPPD...',
+  '........................',
+  '........................',
+  '........................',
+  '........................',
+  '........................',
+];
+
+// 17. Дефекация / POOPING
+export const HAMSTER_24_POOPING = [
+  '........................',
+  '........................',
+  '......DDFFF......FFFDD..',
+  '.....DPPPFFD....DFFPPPD.',
+  '....DPPFFFFFFDDFFFFFFPPD',
+  '...DFFFFFFFFFFFFFFFFFFD.',
+  '..DFFFFFFFFFFFFFFFFFFFFD',
+  '.DFFFFFFFFFFFFFFFFFFFFFF',
+  '.DFFEEDFFFFFFFFFFFFDEEFD',
+  '.DFFEHDFFFFDPPDFFFFDEHFD',
+  '.DFFCFDFFFFDPPDFFFFDCFFD',
+  'W.DFFDFFFFFDPPDFFFFFDFFD',
+  'WW.DFFFFFFFFDPDFFFFFFFFD',
+  '.DFFFFFFFFFFFFFFFFFFFFFD',
+  '.DFFFFFFFFFFFFFFFFFFFFFD',
+  '..DFFFFFFFFFFFFFFFFFFD..',
+  '...DFFFFFFFFFFFFFFFFD...',
+  '....DFFD..DFFD..DFFD....',
+  '.....DPPD..DPPD..DPPD...',
+  '........................',
+  '........................',
+  '........................',
+  '........................',
+  '........................',
+];
+
+// Алиасы обратной совместимости
+export const HAMSTER_IDLE_FRAME_1 = HAMSTER_24_IDLE_1;
+export const HAMSTER_IDLE_FRAME_2 = HAMSTER_24_IDLE_2;
+export const HAMSTER_WALK_FRAME_1 = HAMSTER_24_WALK_1;
+export const HAMSTER_WALK_FRAME_2 = HAMSTER_24_WALK_2;
+export const HAMSTER_LAYING_FRAME = HAMSTER_24_LAYING;
+export const HAMSTER_SLEEP_FRAME_1 = HAMSTER_24_SLEEP_1;
+export const HAMSTER_SLEEP_FRAME_2 = HAMSTER_24_SLEEP_2;
+export const HAMSTER_EATING_FRAME_1 = HAMSTER_24_EAT_1;
+export const HAMSTER_EATING_FRAME_2 = HAMSTER_24_EAT_2;
+export const HAMSTER_POOPING_FRAME = HAMSTER_24_POOPING;
 
 /**
  * Меню доступных видов корма

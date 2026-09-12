@@ -1,14 +1,14 @@
 /**
  * ============================================================================
- * КОМПОНЕНТ: SettingsModal (Настройки Питомца, Звука и Сброс Прогресса)
+ * КОМПОНЕНТ: SettingsModal (Настройки, Дзен-Режим и Отключение Статов)
  * ============================================================================
  * 
  * 🎓 ИНТЕРАКТИВНЫЙ УЧЕБНИК: АРХИТЕКТУРНОЕ ОБОСНОВАНИЕ
  * ----------------------------------------------------------------------------
- * 1. ЗАЧЕМ ЭТО НУЖНО (Architectural Reason):
- *    Позволяет игроку в любой момент переименовать хомяка, сменить породу/палитру
- *    из 20 доступных, настроить громкость 8-битного синтезатора или при необходимости
- *    полностью сбросить прогресс и начать игру заново.
+ * 1. УПРАВЛЕНИЕ СЛОЖНОСТЬЮ И РЕЖИМ КОМПАНЬОНА:
+ *    Игрок может превратить приложение в фоновый эстетичный релакс-виджет:
+ *    - Включить "Режим Дзен" (все потребности заморожены на 100%).
+ *    - Либо выборочно отключить голод, загрязнение или сон.
  * ============================================================================
  */
 
@@ -16,6 +16,7 @@
 
 import React, { useState } from 'react';
 import { HAMSTER_PALETTES } from '@/utils/spritePresets';
+import { DisabledStatsConfig } from '@/types/hamster';
 import { soundManager } from '@/utils/soundEffects';
 
 export interface SettingsModalProps {
@@ -25,11 +26,15 @@ export interface SettingsModalProps {
   currentPaletteId: string;
   soundEnabled: boolean;
   soundVolume: number;
+  zenMode: boolean;
+  disabledStats: DisabledStatsConfig;
   onUpdateSettings: (params: {
     petName: string;
     paletteId: string;
     soundEnabled: boolean;
     soundVolume: number;
+    zenMode: boolean;
+    disabledStats: DisabledStatsConfig;
   }) => void;
   onResetProgress: () => void;
 }
@@ -41,6 +46,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   currentPaletteId,
   soundEnabled,
   soundVolume,
+  zenMode,
+  disabledStats,
   onUpdateSettings,
   onResetProgress,
 }) => {
@@ -48,6 +55,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [paletteId, setPaletteId] = useState<string>(currentPaletteId);
   const [isSoundOn, setIsSoundOn] = useState<boolean>(soundEnabled);
   const [volume, setVolume] = useState<number>(soundVolume);
+  const [isZen, setIsZen] = useState<boolean>(zenMode);
+  const [statsConfig, setStatsConfig] = useState<DisabledStatsConfig>(disabledStats);
   const [confirmReset, setConfirmReset] = useState<boolean>(false);
 
   if (!isOpen) return null;
@@ -64,15 +73,25 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       paletteId,
       soundEnabled: isSoundOn,
       soundVolume: volume,
+      zenMode: isZen,
+      disabledStats: statsConfig,
     });
 
     soundManager.playSuccessJingle();
     onClose();
   };
 
+  const toggleStat = (key: keyof DisabledStatsConfig) => {
+    setStatsConfig((prev) => ({
+      ...prev,
+      [key]: !prev[key],
+    }));
+    soundManager.playClickSound();
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn select-none">
-      <div className="bg-retro-dark border-4 border-retro-purple rounded-lg max-w-xl w-full p-6 shadow-pixel-lg text-white font-pixel max-h-[90vh] overflow-y-auto">
+      <div className="bg-retro-dark border-4 border-retro-purple rounded-lg max-w-xl w-full p-5 sm:p-6 shadow-pixel-lg text-white font-pixel max-h-[90vh] overflow-y-auto">
         {/* Заголовок */}
         <div className="flex justify-between items-center pb-3 border-b-2 border-retro-blue mb-4">
           <div className="flex items-center gap-2">
@@ -91,6 +110,76 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         </div>
 
         <div className="space-y-4">
+          {/* Секция: Режим Дзен (Без забот) */}
+          <div className="bg-retro-purple/90 p-3 rounded border-2 border-retro-yellow">
+            <div className="flex justify-between items-center mb-2">
+              <div>
+                <h3 className="text-xs text-retro-yellow">✨ РЕЖИМ ДЗЕН (КОМПАНЬОН)</h3>
+                <p className="text-[8px] text-retro-white/80 mt-1 leading-relaxed">
+                  Хомячок не голодает, не пачкает клетку и не болеет. Фоновый питомец для релакса!
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  const next = !isZen;
+                  setIsZen(next);
+                  soundManager.playClickSound();
+                }}
+                className={`px-3 py-1.5 text-[9px] border-2 border-black rounded font-bold shadow-pixel-sm ${
+                  isZen ? 'bg-retro-yellow text-black' : 'bg-retro-dark text-retro-grey'
+                }`}
+              >
+                {isZen ? 'ВКЛЮЧЕН' : 'ВЫКЛ'}
+              </button>
+            </div>
+
+            {/* Выборочное отключение статов (если Дзен выключен) */}
+            {!isZen && (
+              <div className="mt-3 pt-2 border-t border-black/40 space-y-1.5">
+                <span className="text-[8px] text-retro-cyan block mb-1">
+                  ТОЧЕЧНОЕ ОТКЛЮЧЕНИЕ СТАТОВ:
+                </span>
+                <label className="flex items-center gap-2 text-[8px] text-retro-white cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={statsConfig.hunger}
+                    onChange={() => toggleStat('hunger')}
+                    className="cursor-pointer"
+                  />
+                  <span>Отключить голод (всегда сыт)</span>
+                </label>
+                <label className="flex items-center gap-2 text-[8px] text-retro-white cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={statsConfig.hygiene}
+                    onChange={() => toggleStat('hygiene')}
+                    className="cursor-pointer"
+                  />
+                  <span>Отключить загрязнение (нет какашек)</span>
+                </label>
+                <label className="flex items-center gap-2 text-[8px] text-retro-white cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={statsConfig.energy}
+                    onChange={() => toggleStat('energy')}
+                    className="cursor-pointer"
+                  />
+                  <span>Отключить усталость (всегда бодр)</span>
+                </label>
+                <label className="flex items-center gap-2 text-[8px] text-retro-white cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={statsConfig.health}
+                    onChange={() => toggleStat('health')}
+                    className="cursor-pointer"
+                  />
+                  <span>Отключить урон здоровью (бессмертие)</span>
+                </label>
+              </div>
+            )}
+          </div>
+
           {/* Смена имени */}
           <div className="bg-retro-purple p-3 rounded border-2 border-black">
             <label className="block text-xs text-retro-cyan mb-2">
@@ -108,9 +197,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           {/* Смена окраса (20 палитр) */}
           <div className="bg-retro-purple p-3 rounded border-2 border-black">
             <label className="block text-xs text-retro-cyan mb-2">
-              ПОРОДА / ОКРАС (20 ПАЛИТР):
+              ПОРОДА / ОКРАС (20 ДИЗАЙНЕРСКИХ ПАЛИТР):
             </label>
-            <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto pr-1">
+            <div className="grid grid-cols-2 gap-2 max-h-36 overflow-y-auto pr-1">
               {HAMSTER_PALETTES.map((p) => (
                 <button
                   key={p.id}
@@ -119,7 +208,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     setPaletteId(p.id);
                     soundManager.playClickSound();
                   }}
-                  className={`p-2 rounded border-2 text-left flex items-center gap-2 text-[9px] ${
+                  className={`p-2 rounded border-2 text-left flex items-center gap-2 text-[8px] ${
                     paletteId === p.id
                       ? 'border-retro-yellow bg-retro-blue font-bold shadow-pixel-sm'
                       : 'border-black bg-retro-dark hover:bg-retro-dark/80'
@@ -135,11 +224,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
           </div>
 
-          {/* Настройки звука */}
-          <div className="bg-retro-purple p-3 rounded border-2 border-black space-y-3">
+          {/* Звук */}
+          <div className="bg-retro-purple p-3 rounded border-2 border-black space-y-2">
             <div className="flex justify-between items-center">
               <span className="text-xs text-retro-cyan">8-БИТНЫЙ ЗВУК:</span>
               <button
+                type="button"
                 onClick={() => {
                   const next = !isSoundOn;
                   setIsSoundOn(next);
@@ -156,7 +246,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
             {isSoundOn && (
               <div>
-                <div className="flex justify-between text-[9px] text-retro-grey mb-1">
+                <div className="flex justify-between text-[8px] text-retro-grey mb-1">
                   <span>ГРОМКОСТЬ:</span>
                   <span>{Math.round(volume * 100)}%</span>
                 </div>
@@ -177,17 +267,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             )}
           </div>
 
-          {/* Опасная зона: Сброс игры */}
+          {/* Сброс */}
           <div className="bg-retro-purple/40 p-3 rounded border-2 border-retro-red/50">
-            <div className="text-xs text-retro-red font-bold mb-1">ОПАСНАЯ ЗОНА</div>
-            <p className="text-[8px] text-retro-white/70 mb-2">
-              Полный сброс удалит питомца и вернет игру к начальному онбордингу.
-            </p>
+            <div className="text-xs text-retro-red font-bold mb-1">СБРОС ПРОГРЕССА</div>
             {!confirmReset ? (
               <button
                 type="button"
                 onClick={() => setConfirmReset(true)}
-                className="py-1.5 px-3 bg-retro-red/70 hover:bg-retro-red text-white text-[9px] border-2 border-black rounded"
+                className="py-1.5 px-3 bg-retro-red/70 hover:bg-retro-red text-white text-[8px] border-2 border-black rounded"
               >
                 Начать заново с чистого листа
               </button>
@@ -199,14 +286,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     onResetProgress();
                     onClose();
                   }}
-                  className="py-1.5 px-3 bg-retro-red text-white text-[9px] font-bold border-2 border-black rounded animate-pulse"
+                  className="py-1.5 px-3 bg-retro-red text-white text-[8px] font-bold border-2 border-black rounded animate-pulse"
                 >
-                  Да, точно сбросить!
+                  Да, сбросить!
                 </button>
                 <button
                   type="button"
                   onClick={() => setConfirmReset(false)}
-                  className="py-1.5 px-3 bg-retro-blue text-white text-[9px] border-2 border-black rounded"
+                  className="py-1.5 px-3 bg-retro-blue text-white text-[8px] border-2 border-black rounded"
                 >
                   Отмена
                 </button>
@@ -215,9 +302,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           </div>
         </div>
 
-        {/* Кнопка сохранения */}
-        <div className="mt-6 pt-4 border-t-2 border-retro-blue flex justify-end gap-3">
+        {/* Футер */}
+        <div className="mt-5 pt-3 border-t-2 border-retro-blue flex justify-end gap-3">
           <button
+            type="button"
             onClick={() => {
               soundManager.playClickSound();
               onClose();
@@ -227,6 +315,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             Закрыть
           </button>
           <button
+            type="button"
             onClick={handleSave}
             className="py-2 px-6 bg-retro-green hover:brightness-110 text-black font-bold border-2 border-black rounded text-xs shadow-pixel-sm"
           >

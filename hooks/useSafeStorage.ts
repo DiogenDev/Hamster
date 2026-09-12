@@ -1,41 +1,17 @@
 /**
  * ============================================================================
- * КАСТОМНЫЙ ХУК: useSafeStorage (SSR-Безопасное Хранилище + Оффлайн-Дельта)
+ * КАСТОМНЫЙ ХУК: useSafeStorage (SSR-Безопасное Хранилище + Оффлайн-Дельта + Дзен)
  * ============================================================================
  * 
  * 🎓 ИНТЕРАКТИВНЫЙ УЧЕБНИК: АРХИТЕКТУРНОЕ ОБОСНОВАНИЕ
  * ----------------------------------------------------------------------------
  * 1. ЗАЧЕМ ЭТО НУЖНО (Architectural Reason):
- *    В Next.js App Router компоненты по умолчанию рендерятся на Node.js сервере.
- *    На сервере глобального объекта `window` и `window.localStorage` НЕ СУЩЕСТВУЕТ.
- *    Если обратиться к `localStorage` при первом рендере напрямую:
- *      - Сервер отрендерит HTML со стандартными дефолтными значениями (или упадет с ReferenceError: window is not defined).
- *      - Браузер при загрузке прочитает localStorage и попытается отрендерить другие данные.
- *      - Возникнет фатальная ошибка гидратации React:
- *        "Hydration failed because the initial UI does not match what was rendered on the server".
- * 
- * 2. КАК ЭТО РАБОТАЕТ (Algorithmic Essence):
- *    - Паттерн "Двухфазного монтирования" (Two-pass Rendering / isMounted):
- *      При первом рендере хук возвращает дефолтный `initialState` и флаг `isHydrated = false`.
- *      В хуке `useEffect` (который выполняется ТОЛЬКО в браузере после монтирования DOM)
- *      мы безопасно считываем данные из localStorage, применяем формулу оффлайн-дельты
- *      и переключаем `isHydrated = true`.
- * 
- * 3. МАТЕМАТИКА ОФФЛАЙН-ПРОГРЕССА (Offline Delta Time):
- *    Формула:
- *      deltaSeconds = Math.max(0, (currentTimeMs - lastSavedTimestamp) / 1000)
- *    Спад показателей за время отсутствия игрока:
- *      - hunger: deltaSeconds / 25 сек (каждые 25с теряется 1 сытость)
- *      - energy: если спал — растет (deltaSeconds / 20 сек), если бодрствовал — падает (deltaSeconds / 35 сек)
- *      - hygiene: deltaSeconds / 45 сек
- *      - soft-cap (Мягкий ограничитель):
- *        Все показатели ограничиваются снизу порогом Math.max(5, value).
- *        Питомец НИКОГДА не погибнет во время сна игрока или закрытой вкладки!
- * 
- * 4. ПОДВОДНЫЕ КАМНИ (Pitfalls & Gotchas):
- *    - Чрезмерная запись в localStorage: `localStorage.setItem` синхронный и блокирует поток UI.
- *      Записывать данные 60 раз в секунду в requestAnimationFrame категорически нельзя!
- *      Мы сохраняем данные по интервалу (раз в 2 секунды) и по событию `beforeunload`/`visibilitychange`.
+ *    В режиме "Дзен / Браузерный компаньон" (zenMode) или при отключенных статах,
+ *    оффлайн-расчет обязан уважать настройки игрока:
+ *    - Если голод отключен, за время отсутствия он не падает.
+ *    - Если гигиена отключена, какашки не генерируются на дне клетки.
+ *    - Если игрок вернулся, отчет показывает приятное сообщение о том,
+ *      что хомячок просто сладко спал или катался в колесе.
  * ============================================================================
  */
 
@@ -45,12 +21,11 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   TamagotchiSaveData,
   HamsterBehavior,
-  HamsterNeeds,
   PoopItem,
 } from '@/types/hamster';
 
 /** Ключ сохранения в localStorage браузера */
-const STORAGE_KEY = 'hamster_diogen_tamagotchi_v1';
+const STORAGE_KEY = 'hamster_diogen_tamagotchi_v2';
 
 /** Начальное состояние для нового хомячка */
 export const DEFAULT_SAVE_DATA: TamagotchiSaveData = {
@@ -78,6 +53,14 @@ export const DEFAULT_SAVE_DATA: TamagotchiSaveData = {
   isOnboarded: false,
   soundEnabled: true,
   soundVolume: 0.7,
+  zenMode: false,
+  disabledStats: {
+    hunger: false,
+    energy: false,
+    hygiene: false,
+    happiness: false,
+    health: false,
+  },
 };
 
 export interface OfflineReport {
@@ -86,10 +69,11 @@ export interface OfflineReport {
   energyChange: number;
   hygieneLost: number;
   newPoopsCount: number;
+  isZen: boolean;
 }
 
 /**
- * Функция расчета деградации/роста показателей в оффлайне с формулой soft-cap
+ * Функция расчета деградации/роста показателей в оффлайне с учетом Дзен-режима
  */
 export function calculateOfflineProgress(
   savedData: TamagotchiSaveData,
@@ -97,7 +81,6 @@ export function calculateOfflineProgress(
 ): { updatedData: TamagotchiSaveData; report: OfflineReport | null } {
   const deltaSeconds = Math.max(0, Math.floor((nowMs - savedData.lastSavedTimestamp) / 1000));
 
-  // Если отсутствовали менее 5 секунд, оффлайн расчет пропускаем (простая перезагрузка)
   if (deltaSeconds < 5) {
     return {
       updatedData: {
@@ -108,57 +91,79 @@ export function calculateOfflineProgress(
     };
   }
 
+  const isZen = savedData.zenMode;
+  const disabled = savedData.disabledStats || DEFAULT_SAVE_DATA.disabledStats;
   const currentNeeds = { ...savedData.needs };
 
-  // 1. Расчет голода: -1 за каждые 25 секунд
-  const hungerLost = Math.floor(deltaSeconds / 25);
-  // Мягкий порог (soft-cap): не ниже 5 единиц в оффлайне!
-  currentNeeds.hunger = Math.max(5, currentNeeds.hunger - hungerLost);
-
-  // 2. Расчет энергии:
+  let hungerLost = 0;
   let energyChange = 0;
-  if (savedData.behavior === HamsterBehavior.SLEEP) {
-    // Во сне восстанавливает 1 единицу за 20 секунд
-    energyChange = Math.floor(deltaSeconds / 20);
-    currentNeeds.energy = Math.min(100, currentNeeds.energy + energyChange);
-  } else {
-    // При бодрствовании теряет 1 единицу за 35 секунд
-    energyChange = -Math.floor(deltaSeconds / 35);
-    currentNeeds.energy = Math.max(5, currentNeeds.energy + energyChange);
-  }
-
-  // 3. Расчет гигиены: -1 за каждые 45 секунд
-  const hygieneLost = Math.floor(deltaSeconds / 45);
-  currentNeeds.hygiene = Math.max(5, currentNeeds.hygiene - hygieneLost);
-
-  // 4. Появление какашек при долгой оффлайн-сессии:
-  // Если гигиена упала ниже 35, генерируем от 1 до 3 какашек
+  let hygieneLost = 0;
   let newPoopsCount = 0;
   const newPoops: PoopItem[] = [...savedData.poops];
-  if (currentNeeds.hygiene < 40 && newPoops.length < 5) {
-    newPoopsCount = Math.min(3, Math.floor(deltaSeconds / 300) + 1);
-    for (let i = 0; i < newPoopsCount && newPoops.length < 5; i++) {
-      newPoops.push({
-        id: `poop_${nowMs}_${i}`,
-        // Случайные координаты по ширине клетки (от 80 до 240 px)
-        x: Math.floor(80 + Math.random() * 160),
-        y: 195 + Math.floor(Math.random() * 10),
-        createdAt: nowMs - i * 1000,
-      });
+
+  if (!isZen) {
+    // 1. Голод
+    if (!disabled.hunger) {
+      hungerLost = Math.floor(deltaSeconds / 25);
+      currentNeeds.hunger = Math.max(5, currentNeeds.hunger - hungerLost);
+    } else {
+      currentNeeds.hunger = 100;
     }
-  }
 
-  // 5. Расчет счастья и здоровья:
-  // Если питомец очень голоден (< 20) или грязно (< 20), счастье стремительно падает
-  if (currentNeeds.hunger < 20 || currentNeeds.hygiene < 20) {
-    const happinessLost = Math.floor(deltaSeconds / 40);
-    currentNeeds.happiness = Math.max(5, currentNeeds.happiness - happinessLost);
-  }
+    // 2. Энергия
+    if (!disabled.energy) {
+      if (savedData.behavior === HamsterBehavior.SLEEP) {
+        energyChange = Math.floor(deltaSeconds / 20);
+        currentNeeds.energy = Math.min(100, currentNeeds.energy + energyChange);
+      } else {
+        energyChange = -Math.floor(deltaSeconds / 35);
+        currentNeeds.energy = Math.max(5, currentNeeds.energy + energyChange);
+      }
+    } else {
+      currentNeeds.energy = 100;
+    }
 
-  // Здоровье страдает только при крайнем истощении (soft-cap = 10%)
-  if (currentNeeds.hunger <= 10 || currentNeeds.hygiene <= 10) {
-    const healthLost = Math.floor(deltaSeconds / 60);
-    currentNeeds.health = Math.max(10, currentNeeds.health - healthLost);
+    // 3. Гигиена и какашки
+    if (!disabled.hygiene) {
+      hygieneLost = Math.floor(deltaSeconds / 45);
+      currentNeeds.hygiene = Math.max(5, currentNeeds.hygiene - hygieneLost);
+
+      if (currentNeeds.hygiene < 40 && newPoops.length < 5) {
+        newPoopsCount = Math.min(3, Math.floor(deltaSeconds / 300) + 1);
+        for (let i = 0; i < newPoopsCount && newPoops.length < 5; i++) {
+          newPoops.push({
+            id: `poop_${nowMs}_${i}`,
+            x: Math.floor(100 + Math.random() * 260),
+            y: 152 + Math.floor(Math.random() * 8),
+            createdAt: nowMs - i * 1000,
+          });
+        }
+      }
+    } else {
+      currentNeeds.hygiene = 100;
+    }
+
+    // 4. Счастье и Здоровье
+    if (!disabled.happiness && (currentNeeds.hunger < 20 || currentNeeds.hygiene < 20)) {
+      const happinessLost = Math.floor(deltaSeconds / 40);
+      currentNeeds.happiness = Math.max(5, currentNeeds.happiness - happinessLost);
+    } else if (disabled.happiness) {
+      currentNeeds.happiness = 100;
+    }
+
+    if (!disabled.health && (currentNeeds.hunger <= 10 || currentNeeds.hygiene <= 10)) {
+      const healthLost = Math.floor(deltaSeconds / 60);
+      currentNeeds.health = Math.max(10, currentNeeds.health - healthLost);
+    } else if (disabled.health) {
+      currentNeeds.health = 100;
+    }
+  } else {
+    // В режиме Дзен все статы идеальны
+    currentNeeds.hunger = 100;
+    currentNeeds.energy = 100;
+    currentNeeds.hygiene = 100;
+    currentNeeds.happiness = 100;
+    currentNeeds.health = 100;
   }
 
   const updatedData: TamagotchiSaveData = {
@@ -175,6 +180,7 @@ export function calculateOfflineProgress(
     energyChange,
     hygieneLost,
     newPoopsCount,
+    isZen,
   };
 
   return { updatedData, report };
@@ -188,20 +194,30 @@ export function useSafeStorage() {
   const [isHydrated, setIsHydrated] = useState(false);
   const [offlineReport, setOfflineReport] = useState<OfflineReport | null>(null);
 
-  // Реф для актуального состояния при сохранении в обработчиках событий
   const dataRef = useRef<TamagotchiSaveData>(DEFAULT_SAVE_DATA);
   dataRef.current = data;
 
-  // Инициализация при монтировании в браузере
   useEffect(() => {
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
+      // Поддержка миграции v1 -> v2 если ключ v2 еще не существует
+      let raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) {
+        raw = localStorage.getItem('hamster_diogen_tamagotchi_v1');
+      }
+
       if (raw) {
-        const parsed = JSON.parse(raw) as TamagotchiSaveData;
-        // Расчет оффлайн-прогресса
-        const { updatedData, report } = calculateOfflineProgress(parsed, Date.now());
+        const parsed = JSON.parse(raw) as Partial<TamagotchiSaveData>;
+        const merged: TamagotchiSaveData = {
+          ...DEFAULT_SAVE_DATA,
+          ...parsed,
+          disabledStats: {
+            ...DEFAULT_SAVE_DATA.disabledStats,
+            ...(parsed.disabledStats || {}),
+          },
+        };
+        const { updatedData, report } = calculateOfflineProgress(merged, Date.now());
         setData(updatedData);
-        if (report && report.deltaSeconds > 60) {
+        if (report && report.deltaSeconds > 60 && !report.isZen) {
           setOfflineReport(report);
         }
       } else {
@@ -215,7 +231,6 @@ export function useSafeStorage() {
     }
   }, []);
 
-  // Синхронное сохранение в localStorage
   const persistNow = useCallback((saveTarget?: TamagotchiSaveData) => {
     try {
       const target = saveTarget || dataRef.current;
@@ -229,7 +244,6 @@ export function useSafeStorage() {
     }
   }, []);
 
-  // Периодическое автосохранение раз в 3 секунды
   useEffect(() => {
     if (!isHydrated) return;
 
@@ -237,7 +251,6 @@ export function useSafeStorage() {
       persistNow();
     }, 3000);
 
-    // Сохранение при сворачивании страницы или закрытии вкладки
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'hidden') {
         persistNow();
@@ -258,10 +271,10 @@ export function useSafeStorage() {
     };
   }, [isHydrated, persistNow]);
 
-  // Сброс игры на заводские настройки
   const resetSaveData = useCallback(() => {
     try {
       localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem('hamster_diogen_tamagotchi_v1');
       setData({
         ...DEFAULT_SAVE_DATA,
         lastSavedTimestamp: Date.now(),

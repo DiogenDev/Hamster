@@ -1,40 +1,11 @@
 /**
  * ============================================================================
- * МОДУЛЬ: УТИЛИТЫ CANVAS 2D И АЛГОРИТМ FLOOD FILL (ЗАЛИВКА)
- * ============================================================================
- * 
- * 🎓 ИНТЕРАКТИВНЫЙ УЧЕБНИК: АРХИТЕКТУРНОЕ ОБОСНОВАНИЕ
- * ----------------------------------------------------------------------------
- * 1. ЗАЧЕМ ЭТО НУЖНО (Architectural Reason):
- *    - Четкость пикселей (Pixel Perfect Scaling):
- *      Стандартный Canvas 2D выполняет антиалиасинг (размытие) при нецелочисленных координатах
- *      (x = 12.34px). Для ретро-эстетики 8-bit все координаты обязаны округляться
- *      до целых чисел (`Math.floor`), а `imageSmoothingEnabled` должен быть выключен.
- *    - Оптимизация вызовов отрисовки:
- *      Каждый вызов `ctx.fillStyle` и `ctx.fillRect()` создает накладные расходы.
- *      Объединение соседних пикселей одного цвета в единые горизонтальные полосы (Run-Length)
- *      сокращает число draw calls на 60-80%.
- * 
- * 2. АЛГОРИТМ FLOOD FILL (Заливка замкнутой области):
- *    - Почему НЕЛЬЗЯ использовать наивную рекурсию:
- *      Функция `fill(x, y)` с 4 рекурсивными вызовами на холсте 24x24 может сделать
- *      глубину стека более 576 вызовов, что в мобильных браузерах вызывает фатальный
- *      "RangeError: Maximum call stack size exceeded".
- *    - Решение: Итеративный алгоритм на основе очереди/стека (BFS / Depth-Limited Stack).
- *      Мы храним координаты в обычном массиве `stack = [[startX, startY]]` в куче (heap),
- *      где нет ограничений на глубину стека вызовов функций.
- * 
- * 3. ПОДВОДНЫЕ КАМНИ (Pitfalls & Gotchas):
- *    - Зацикливание заливки: Если цвет клика совпадает с цветом заливки (`targetColor === fillColor`),
- *      алгоритм без предварительной проверки уйдет в бесконечный цикл. Всегда проверяем `targetColor === fillColor` в первой строке!
+ * МОДУЛЬ: УТИЛИТЫ CANVAS 2D И АЛГОРИТМ FLOOD FILL (V2)
  * ============================================================================
  */
 
 import { HamsterPalette, PixelGrid } from '@/types/hamster';
 
-/**
- * Отрисовка целочисленного пиксельного прямоугольника без субпиксельного размытия
- */
 export function drawPixelRect(
   ctx: CanvasRenderingContext2D,
   x: number,
@@ -48,7 +19,7 @@ export function drawPixelRect(
 }
 
 /**
- * Отрисовка символьной матрицы 16x16 хомячка с наложением цветовой палитры и поддержкой flipX
+ * Отрисовка символьной матрицы (16x16 или 24x24) хомячка с наложением палитры и поддержкой flipX
  */
 export function drawCharacterMatrix(
   ctx: CanvasRenderingContext2D,
@@ -56,7 +27,7 @@ export function drawCharacterMatrix(
   startX: number,
   startY: number,
   palette: HamsterPalette,
-  pixelSize: number = 3,
+  pixelSize: number = 2,
   flipX: boolean = false
 ) {
   const rows = matrix.length;
@@ -66,18 +37,20 @@ export function drawCharacterMatrix(
     const rowStr = matrix[r];
     for (let c = 0; c < cols; c++) {
       const char = rowStr[c];
-      if (char === '.') continue; // Прозрачный пиксель
+      if (char === '.') continue;
 
       let color: string | null = null;
       switch (char) {
         case 'F': color = palette.fur; break;
         case 'D': color = palette.furDark; break;
+        case 'L': color = palette.furLight || palette.fur; break;
         case 'B': color = palette.belly; break;
         case 'P': color = palette.pink; break;
         case 'E': color = palette.eyes; break;
         case 'H': color = palette.eyeHighlight; break;
         case 'C': color = palette.cheeks; break;
-        case 'S': color = '#e28743'; break; // Зернышко
+        case 'W': color = '#e2e8f0'; break; // Усики
+        case 'S': color = '#d97706'; break; // Зернышко
         default: color = null;
       }
 
@@ -100,7 +73,7 @@ export function drawCustomPixelGrid(
   grid: PixelGrid,
   startX: number,
   startY: number,
-  pixelSize: number = 3,
+  pixelSize: number = 2,
   flipX: boolean = false
 ) {
   const rows = grid.length;
@@ -123,12 +96,6 @@ export function drawCustomPixelGrid(
 
 /**
  * ИТЕРАТИВНЫЙ АЛГОРИТМ FLOOD FILL (4-связная заливка)
- * 
- * @param grid Исходная матрица пикселей
- * @param startX Координата X клика (колонка)
- * @param startY Координата Y клика (строка)
- * @param fillColor Новый цвет (#RRGGBB или null для прозрачности)
- * @returns Новая иммутабельная копия матрицы с выполненной заливкой
  */
 export function executeFloodFill(
   grid: PixelGrid,
@@ -140,22 +107,16 @@ export function executeFloodFill(
   if (height === 0) return grid;
   const width = grid[0].length;
 
-  // Проверка выхода начальной точки за границы
   if (startX < 0 || startX >= width || startY < 0 || startY >= height) {
     return grid;
   }
 
   const targetColor = grid[startY][startX];
-
-  // Если целевой цвет уже равен новому, заливка не требуется
   if (targetColor === fillColor) {
     return grid;
   }
 
-  // Создаем глубокую копию сетки, соблюдая иммутабельность React
   const newGrid: PixelGrid = grid.map((row) => [...row]);
-
-  // Стек для итеративного обхода в глубину (защита от переполнения стека JS)
   const stack: [number, number][] = [[startX, startY]];
 
   while (stack.length > 0) {
@@ -163,14 +124,10 @@ export function executeFloodFill(
     if (!point) continue;
     const [x, y] = point;
 
-    // Проверяем границы
     if (x < 0 || x >= width || y < 0 || y >= height) continue;
 
-    // Если цвет пикселя соответствует заменяемому цвету
     if (newGrid[y][x] === targetColor) {
       newGrid[y][x] = fillColor;
-
-      // Добавляем 4 соседних пикселя (Север, Юг, Восток, Запад)
       stack.push([x + 1, y]);
       stack.push([x - 1, y]);
       stack.push([x, y + 1]);
@@ -206,19 +163,17 @@ export function drawPixelSpeechBubble(
   ctx.fillRect(bx - 1, by + 2, bubbleW + 2, bubbleH - 4);
   ctx.fillRect(bx + 2, by - 1, bubbleW - 4, bubbleH + 2);
 
-  // Хвостик облачка (указывает на макушку хомяка)
+  // Хвостик
   ctx.fillRect(centerX - 2, by + bubbleH, 4, 3);
   ctx.fillRect(centerX - 1, by + bubbleH + 3, 2, 2);
 
-  // Белое пиксельное тело баббла
+  // Белое заполнение
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(bx, by + 1, bubbleW, bubbleH - 2);
   ctx.fillRect(bx + 1, by, bubbleW - 2, bubbleH);
-
-  // Белое заполнение хвостика
   ctx.fillRect(centerX - 1, by + bubbleH, 2, 3);
 
-  // Отрисовка пиксельного эмодзи по центру баббла
+  // Эмодзи
   ctx.font = '14px sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';

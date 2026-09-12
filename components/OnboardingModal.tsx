@@ -21,7 +21,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { HAMSTER_PALETTES, HAMSTER_IDLE_FRAME_1 } from '@/utils/spritePresets';
+import { HAMSTER_PALETTES, HAMSTER_24_IDLE_1 } from '@/utils/spritePresets';
 import { HamsterPalette } from '@/types/hamster';
 import { drawCharacterMatrix } from '@/utils/canvasUtils';
 import { soundManager } from '@/utils/soundEffects';
@@ -182,7 +182,7 @@ function CanvasPreview({ palette }: { palette: HamsterPalette }) {
 
     ctx.imageSmoothingEnabled = false;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    drawCharacterMatrix(ctx, HAMSTER_IDLE_FRAME_1, 8, 8, palette, 4, false);
+    drawCharacterMatrix(ctx, HAMSTER_24_IDLE_1, 4, 4, palette, 3, false);
   }, [palette]);
 
   return <canvas ref={canvasRef} width={80} height={80} className="block" />;
