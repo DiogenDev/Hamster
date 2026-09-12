@@ -1,19 +1,18 @@
 /**
  * ============================================================================
- * КОМПОНЕНТ: CageCanvas (Панорамный 480x180 Движок Клетки с 2x Детализацией)
+ * КОМПОНЕНТ: CageCanvas (Панорамный 480x180 Движок с 3D-Колесом и Овальным Хомяком)
  * ============================================================================
  * 
- * 🎓 ИНТЕРАКТИВНЫЙ УЧЕБНИК: АРХИТЕКТУРНОЕ ОБОСНОВАНИЕ
+ * 🎓 ИНТЕРАКТИВНЫЙ УЧЕБНИК: ПОСЛОЙНЫЙ 3D-РЕНДЕРИНГ БЕГОВОГО КОЛЕСА
  * ----------------------------------------------------------------------------
- * 1. ПАНОРАМНЫЙ ФОРМАТ (480 x 180 px):
- *    Соотношение сторон 8:3 (2.67:1) идеально подходит для роли фонового браузерного виджета:
- *    он не занимает полезную высоту экрана, при этом давая хомяку широкую беговую зону.
- * 
- * 2. 2X ДЕТАЛИЗАЦИЯ И ИНТЕРАКТИВНОЕ БЕГОВОЕ КОЛЕСО:
- *    - Вращающееся колесо (Exercise Wheel) с процедурным тригонометрическим
- *      расчетом спиц (`cos(angle)`, `sin(angle)`).
- *    - 24x24 спрайты хомяка (4-кадровая походка, бег в колесе, умывание ушек, обнюхивание).
- *    - Двойной слой золотистых опилок с текстурными древесными завитками.
+ * 1. ПОЧЕМУ ХОМЯК КАЗАЛСЯ СТОЯЩИМ "РЯДОМ" С КОЛЕСОМ (Z-Ordering Issue):
+ *    Если нарисовать колесо целиком, а потом поверх него хомяка, хомяк перекрывает
+ *    все спицы и обод, создавая оптическую иллюзию, что он стоит перед колесом.
+ *    Решение: Многослойный сэндвич-рендеринг (Multi-Pass Compositing):
+ *      Слой 1: Задний план клетки, поддон, задний обод и задние спицы колеса.
+ *      Слой 2: Хомячок, бегущий точно по нижней внутренней дуге колеса.
+ *      Слой 3: Передний полупрозрачный обод, передние вращающиеся спицы и центральная ось.
+ *    Хомяк оказывается физически ВНУТРИ колеса, а вращающиеся спицы проходят ПЕРЕД ним!
  * ============================================================================
  */
 
@@ -82,6 +81,11 @@ export interface CageCanvasProps {
 const VIRTUAL_WIDTH = 480;
 const VIRTUAL_HEIGHT = 180;
 
+// Координаты центра и радиус колеса
+const WHEEL_CX = 56;
+const WHEEL_CY = 86;
+const WHEEL_RADIUS = 35;
+
 export const CageCanvas: React.FC<CageCanvasProps> = ({
   palette,
   customSprite,
@@ -102,21 +106,96 @@ export const CageCanvas: React.FC<CageCanvasProps> = ({
   const wheelAngleRef = useRef<number>(0);
 
   /**
-   * Отрисовка декораций панорамной клетки
+   * Задняя половина колеса (рисуется ДО хомяка)
+   */
+  const drawWheelBack = (ctx: CanvasRenderingContext2D) => {
+    // 1. Металлическая подставка-тренога колеса
+    ctx.fillStyle = '#1c1e2b';
+    ctx.fillRect(WHEEL_CX - 4, WHEEL_CY, 8, 54);
+    ctx.fillRect(WHEEL_CX - 24, WHEEL_CY + 50, 48, 6);
+
+    // 2. Задняя стенка и беговая дорожка колеса
+    ctx.strokeStyle = '#005f73';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.arc(WHEEL_CX, WHEEL_CY, WHEEL_RADIUS, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Задняя внутренняя тень трека
+    ctx.fillStyle = 'rgba(0, 30, 45, 0.4)';
+    ctx.beginPath();
+    ctx.arc(WHEEL_CX, WHEEL_CY, WHEEL_RADIUS - 2, 0, Math.PI * 2);
+    ctx.fill();
+  };
+
+  /**
+   * Передняя половина колеса (рисуется ПОВЕРХ хомяка, чтобы он был внутри)
+   */
+  const drawWheelFront = (ctx: CanvasRenderingContext2D, isSpinning: boolean) => {
+    if (isSpinning) {
+      wheelAngleRef.current += 0.28;
+    }
+
+    const angle = wheelAngleRef.current;
+
+    // 1. Передний обод колеса (неоново-бирюзовый полупрозрачный)
+    ctx.strokeStyle = 'rgba(0, 245, 212, 0.85)';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(WHEEL_CX, WHEEL_CY, WHEEL_RADIUS, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Тонкий внешний контур
+    ctx.strokeStyle = '#00bbf9';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(WHEEL_CX, WHEEL_CY, WHEEL_RADIUS + 2, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // 2. Вращающиеся передние спицы
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.75)';
+    ctx.lineWidth = 1.5;
+    for (let i = 0; i < 6; i++) {
+      const spAngle = angle + (i * Math.PI) / 3;
+      const x1 = WHEEL_CX + Math.cos(spAngle) * 4;
+      const y1 = WHEEL_CY + Math.sin(spAngle) * 4;
+      const x2 = WHEEL_CX + Math.cos(spAngle) * (WHEEL_RADIUS - 2);
+      const y2 = WHEEL_CY + Math.sin(spAngle) * (WHEEL_RADIUS - 2);
+
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+    }
+
+    // 3. Центральная ступица колеса
+    ctx.fillStyle = '#0f1423';
+    ctx.beginPath();
+    ctx.arc(WHEEL_CX, WHEEL_CY, 5, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#fee440';
+    ctx.beginPath();
+    ctx.arc(WHEEL_CX, WHEEL_CY, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+  };
+
+  /**
+   * Отрисовка декораций клетки
    */
   const drawScenery = useCallback(
     (ctx: CanvasRenderingContext2D, time: number) => {
-      // 1. Задний фон комнаты (уютный теплый вечерний интерьер)
+      // 1. Задний фон комнаты
       ctx.fillStyle = '#1e1b2e';
       ctx.fillRect(0, 0, VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
 
-      // Декоративные деревянные рейки стены
+      // Рейки стены
       ctx.fillStyle = '#26223b';
       for (let x = 0; x < VIRTUAL_WIDTH; x += 16) {
         ctx.fillRect(x, 0, 8, 140);
       }
 
-      // 2. Металлическая решетка заднего плана (прутья с шагом 12px)
+      // 2. Металлическая решетка заднего плана
       ctx.fillStyle = '#3e4868';
       for (let x = 12; x < VIRTUAL_WIDTH - 12; x += 12) {
         ctx.fillRect(x, 16, 2, 130);
@@ -125,108 +204,42 @@ export const CageCanvas: React.FC<CageCanvasProps> = ({
       ctx.fillRect(12, 70, VIRTUAL_WIDTH - 24, 2);
       ctx.fillRect(12, 125, VIRTUAL_WIDTH - 24, 2);
 
-      // 3. Беговое колесо слева (x = 24..74, центр: 49, 105)
-      drawWheel(ctx, 49, 105, 26, behavior === HamsterBehavior.WHEEL);
+      // 3. Задняя часть бегового колеса
+      drawWheelBack(ctx);
 
-      // 4. Домик (x = 88..144)
-      drawHouse(ctx, furniture.house, 88, 86);
+      // 4. Домик (x = 105..160)
+      drawHouse(ctx, furniture.house, 105, 86);
 
-      // 5. Поилка по центру (x = 236)
-      drawWaterBottle(ctx, furniture.waterBottle, 236, 40, time);
+      // 5. Поилка по центру (x = 246)
+      drawWaterBottle(ctx, furniture.waterBottle, 246, 40, time);
 
-      // 6. Кормушка справа (x = 405..448)
-      drawBowl(ctx, furniture.bowl, furniture.bowlFoodLevel, 408, 128);
+      // 6. Кормушка справа (x = 412..455)
+      drawBowl(ctx, furniture.bowl, furniture.bowlFoodLevel, 412, 128);
 
-      // 7. Поддон клетки с опилками (глубокий деревянный лоток)
-      // Каркас поддона
+      // 7. Поддон с опилками
       drawPixelRect(ctx, 8, 140, VIRTUAL_WIDTH - 16, 38, '#8a4b12');
       drawPixelRect(ctx, 6, 137, VIRTUAL_WIDTH - 12, 5, '#693508');
 
-      // Слой золотистых опилок
       drawPixelRect(ctx, 10, 142, VIRTUAL_WIDTH - 20, 34, '#f5c66e');
       drawPixelRect(ctx, 10, 140, VIRTUAL_WIDTH - 20, 3, '#fbe09e');
 
-      // Пиксельные завитки опилок
       ctx.fillStyle = '#df9b2d';
       for (let x = 20; x < VIRTUAL_WIDTH - 20; x += 18) {
-        const offset = ((x * 7) % 11);
+        const offset = (x * 7) % 11;
         ctx.fillRect(x + offset, 145 + (offset % 5), 4, 2);
         ctx.fillRect(x + 5, 158 + (offset % 6), 3, 2);
         ctx.fillRect(x + 10, 168 + (offset % 4), 4, 2);
       }
       ctx.fillStyle = '#fff4cf';
       for (let x = 22; x < VIRTUAL_WIDTH - 20; x += 22) {
-        const offset = ((x * 13) % 9);
+        const offset = (x * 13) % 9;
         ctx.fillRect(x + offset, 147 + (offset % 4), 3, 1);
         ctx.fillRect(x + 8, 162 + (offset % 5), 2, 1);
       }
     },
-    [furniture, behavior]
+    [furniture]
   );
 
-  /**
-   * Отрисовка интерактивного бегового колеса
-   */
-  const drawWheel = (
-    ctx: CanvasRenderingContext2D,
-    cx: number,
-    cy: number,
-    radius: number,
-    isSpinning: boolean
-  ) => {
-    // Вращение колеса
-    if (isSpinning) {
-      wheelAngleRef.current += 0.22;
-    }
-
-    const angle = wheelAngleRef.current;
-
-    // Металлическая стойка колеса
-    ctx.fillStyle = '#2b2d42';
-    ctx.fillRect(cx - 3, cy, 6, 42);
-    ctx.fillRect(cx - 18, cy + 38, 36, 4);
-
-    // Обод колеса
-    ctx.strokeStyle = '#00b4d8';
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-    ctx.stroke();
-
-    // Внутренний обод с перфорацией
-    ctx.strokeStyle = '#90e0ef';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.arc(cx, cy, radius - 2, 0, Math.PI * 2);
-    ctx.stroke();
-
-    // 8 спиц колеса
-    ctx.strokeStyle = '#caf0f8';
-    ctx.lineWidth = 1.5;
-    for (let i = 0; i < 8; i++) {
-      const spAngle = angle + (i * Math.PI) / 4;
-      const x1 = cx + Math.cos(spAngle) * 3;
-      const y1 = cy + Math.sin(spAngle) * 3;
-      const x2 = cx + Math.cos(spAngle) * (radius - 2);
-      const y2 = cy + Math.sin(spAngle) * (radius - 2);
-      ctx.beginPath();
-      ctx.moveTo(x1, y1);
-      ctx.lineTo(x2, y2);
-      ctx.stroke();
-    }
-
-    // Центральная ступица колеса
-    ctx.fillStyle = '#03045e';
-    ctx.beginPath();
-    ctx.arc(cx, cy, 4, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(cx - 1, cy - 1, 2, 2);
-  };
-
-  /**
-   * Отрисовка домика
-   */
   const drawHouse = (
     ctx: CanvasRenderingContext2D,
     type: FurnitureConfig['house'],
@@ -239,11 +252,9 @@ export const CageCanvas: React.FC<CageCanvasProps> = ({
         drawPixelRect(ctx, x, y + 24, 56, 2, '#5c2d0c');
         drawPixelRect(ctx, x, y + 34, 56, 2, '#5c2d0c');
         drawPixelRect(ctx, x, y + 44, 56, 2, '#5c2d0c');
-        // Крыша
         drawPixelRect(ctx, x - 4, y + 10, 64, 8, '#a0522d');
         drawPixelRect(ctx, x + 4, y + 4, 48, 6, '#cd853f');
         drawPixelRect(ctx, x + 12, y, 32, 5, '#df9b56');
-        // Входная арочка
         drawPixelRect(ctx, x + 18, y + 28, 20, 30, '#2b1704');
         break;
 
@@ -275,9 +286,6 @@ export const CageCanvas: React.FC<CageCanvasProps> = ({
     }
   };
 
-  /**
-   * Отрисовка поилки
-   */
   const drawWaterBottle = (
     ctx: CanvasRenderingContext2D,
     type: FurnitureConfig['waterBottle'],
@@ -313,9 +321,6 @@ export const CageCanvas: React.FC<CageCanvasProps> = ({
     }
   };
 
-  /**
-   * Отрисовка кормушки
-   */
   const drawBowl = (
     ctx: CanvasRenderingContext2D,
     type: FurnitureConfig['bowl'],
@@ -364,8 +369,9 @@ export const CageCanvas: React.FC<CageCanvasProps> = ({
 
     const now = Date.now();
     const timeSec = now / 1000;
+    const isWheeling = behavior === HamsterBehavior.WHEEL;
 
-    // 1. Декорации
+    // 1. Декорации и задняя стенка колеса
     drawScenery(ctx, timeSec);
 
     // 2. Какашки
@@ -373,10 +379,20 @@ export const CageCanvas: React.FC<CageCanvasProps> = ({
       drawPoopSprite(ctx, p.x, p.y, 2);
     });
 
-    // 3. Спрайт хомячка (24x24 с pixelSize = 2 -> итоговый размер 48x48)
-    const hx = Math.floor(posRef.current.x);
-    const hy = Math.floor(posRef.current.y);
-    const flipX = posRef.current.flipX;
+    // 3. Вычисление точных координат хомячка:
+    // Если хомячок крутит колесо, позиционируем его СТРОГО ВНУТРИ круга колеса!
+    let hx = Math.floor(posRef.current.x);
+    let hy = Math.floor(posRef.current.y);
+    let flipX = posRef.current.flipX;
+
+    if (isWheeling) {
+      // Центрируем хомяка точно на нижней дуге колеса
+      // Колесо: CX=56, CY=86, R=35 -> низ колеса y = 121
+      // Хомяк 48x48 px: x = 56 - 24 = 32, y = 121 - 44 = 77
+      hx = WHEEL_CX - 24;
+      hy = WHEEL_CY + WHEEL_RADIUS - 44;
+      flipX = false; // Бежит вперед в колесе
+    }
 
     if (customSprite && customSprite.frames.length > 0) {
       const frameIndex =
@@ -395,7 +411,6 @@ export const CageCanvas: React.FC<CageCanvasProps> = ({
           break;
 
         case HamsterBehavior.WALK:
-          // Плавная 4-кадровая походка (6 FPS)
           const walkStep = Math.floor(timeSec * 6) % 4;
           if (walkStep === 0) currentMatrix = HAMSTER_24_WALK_1;
           else if (walkStep === 1) currentMatrix = HAMSTER_24_WALK_2;
@@ -404,9 +419,8 @@ export const CageCanvas: React.FC<CageCanvasProps> = ({
           break;
 
         case HamsterBehavior.WHEEL:
-          // Быстрый бег в колесе
           currentMatrix =
-            Math.floor(timeSec * 8) % 2 === 0
+            Math.floor(timeSec * 9) % 2 === 0
               ? HAMSTER_24_WHEEL_1
               : HAMSTER_24_WHEEL_2;
           break;
@@ -448,7 +462,10 @@ export const CageCanvas: React.FC<CageCanvasProps> = ({
       drawCharacterMatrix(ctx, currentMatrix, hx, hy, palette, 2, flipX);
     }
 
-    // 4. Частицы
+    // 4. Передняя стенка колеса (рисуется ПОВЕРХ хомяка, чтобы он был ВНУТРИ!)
+    drawWheelFront(ctx, isWheeling);
+
+    // 5. Частицы
     particles.forEach((p) => {
       if (p.char) {
         ctx.font = '12px sans-serif';
@@ -459,14 +476,14 @@ export const CageCanvas: React.FC<CageCanvasProps> = ({
       }
     });
 
-    // 5. Всплывающие эмодзи-бабблы
+    // 6. Спич-бабблы
     emotes.forEach((e) => {
       const bubbleCenterX = hx + 24;
       const bubbleBottomY = hy + e.offsetY;
       drawPixelSpeechBubble(ctx, bubbleCenterX, bubbleBottomY, e.emoji, e.opacity);
     });
 
-    // 6. Передние прутья клетки
+    // 7. Передние прутья клетки
     ctx.fillStyle = 'rgba(62, 72, 104, 0.45)';
     for (let x = 12; x < VIRTUAL_WIDTH - 12; x += 16) {
       ctx.fillRect(x, 16, 2, 130);
@@ -500,15 +517,17 @@ export const CageCanvas: React.FC<CageCanvasProps> = ({
       }
     }
 
-    // 2. Клик по беговому колесу (x = 24..74, y = 78..148)
-    if (clickX >= 24 && clickX <= 74 && clickY >= 75 && clickY <= 148) {
+    // 2. Клик по беговому колесу (зона колеса)
+    const distToWheel = Math.hypot(clickX - WHEEL_CX, clickY - WHEEL_CY);
+    if (distToWheel <= WHEEL_RADIUS + 8) {
       onTapWheel();
       return;
     }
 
     // 3. Клик по хомячку
-    const hx = posRef.current.x;
-    const hy = posRef.current.y;
+    const isWheeling = behavior === HamsterBehavior.WHEEL;
+    const hx = isWheeling ? WHEEL_CX - 24 : posRef.current.x;
+    const hy = isWheeling ? WHEEL_CY + WHEEL_RADIUS - 44 : posRef.current.y;
     if (
       clickX >= hx - 5 &&
       clickX <= hx + 52 &&
@@ -520,13 +539,13 @@ export const CageCanvas: React.FC<CageCanvasProps> = ({
     }
 
     // 4. Клик по кормушке
-    if (clickX >= 400 && clickX <= 455 && clickY >= 120 && clickY <= 155) {
+    if (clickX >= 405 && clickX <= 460 && clickY >= 120 && clickY <= 155) {
       onTapBowl?.();
       return;
     }
 
     // 5. Клик по поилке
-    if (clickX >= 225 && clickX <= 260 && clickY >= 35 && clickY <= 110) {
+    if (clickX >= 235 && clickX <= 270 && clickY >= 35 && clickY <= 110) {
       onTapBottle?.();
       return;
     }
