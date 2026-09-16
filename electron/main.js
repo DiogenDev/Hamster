@@ -15,6 +15,7 @@
 const { app, BrowserWindow, ipcMain, screen, Tray, Menu, Notification } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const http = require('http');
 
 // Идентификатор приложения для Windows Toast-уведомлений
 if (process.platform === 'win32') {
@@ -27,14 +28,101 @@ let wallpaperWindow = null;
 let tray = null;
 let currentMode = 'normal'; // 'normal' | 'pet' | 'wallpaper'
 
+let localServer = null;
+let localPort = null;
+
 const isDev = !app.isPackaged && process.env.NODE_ENV !== 'production';
 
+const MIME_TYPES = {
+  '.html': 'text/html; charset=UTF-8',
+  '.js': 'application/javascript; charset=UTF-8',
+  '.css': 'text/css; charset=UTF-8',
+  '.json': 'application/json; charset=UTF-8',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.svg': 'image/svg+xml',
+  '.ico': 'image/x-icon',
+  '.woff': 'font/woff',
+  '.woff2': 'font/woff2',
+  '.ttf': 'font/ttf',
+  '.mp3': 'audio/mpeg',
+  '.wav': 'audio/wav',
+};
+
+/**
+ * Локальный легковесный HTTP-сервер для раздачи статического экспорта Next.js.
+ * Решает проблему бесконечной загрузки на protocol file://, корректно отдавая
+ * все chunk-скрипты, стили CSS, аудио и изображения с правильными MIME-типами.
+ */
+function startLocalServer() {
+  return new Promise((resolve, reject) => {
+    const outDir = path.join(__dirname, '..', 'out');
+
+    localServer = http.createServer((req, res) => {
+      try {
+        const parsedUrl = new URL(req.url, `http://${req.headers.host || '127.0.0.1'}`);
+        let pathname = decodeURIComponent(parsedUrl.pathname);
+
+        if (pathname === '/' || pathname === '') {
+          pathname = '/index.html';
+        }
+
+        let filePath = path.join(outDir, pathname);
+
+        // Если файл не найден или это папка, пробуем index.html или отдаем корневой index.html (SPA Fallback)
+        if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
+          if (fs.existsSync(filePath + '.html')) {
+            filePath = filePath + '.html';
+          } else if (fs.existsSync(path.join(filePath, 'index.html'))) {
+            filePath = path.join(filePath, 'index.html');
+          } else {
+            filePath = path.join(outDir, 'index.html');
+          }
+        }
+
+        const ext = path.extname(filePath).toLowerCase();
+        const contentType = MIME_TYPES[ext] || 'application/octet-stream';
+
+        fs.readFile(filePath, (err, data) => {
+          if (err) {
+            res.writeHead(404, { 'Content-Type': 'text/plain' });
+            res.end('Not Found');
+            return;
+          }
+          res.writeHead(200, {
+            'Content-Type': contentType,
+            'Access-Control-Allow-Origin': '*',
+            'Cache-Control': 'no-cache',
+          });
+          res.end(data);
+        });
+      } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'text/plain' });
+        res.end('Internal Server Error: ' + err.message);
+      }
+    });
+
+    localServer.listen(0, '127.0.0.1', () => {
+      localPort = localServer.address().port;
+      console.log(`[LocalServer] Serving ${outDir} on http://127.0.0.1:${localPort}`);
+      resolve(localPort);
+    });
+
+    localServer.on('error', (err) => {
+      console.error('[LocalServer] Ошибка сервера:', err);
+      reject(err);
+    });
+  });
+}
+
 function getAppUrl(queryParams = '') {
-  if (isDev) {
-    return `http://localhost:3002/${queryParams ? '?' + queryParams : ''}`;
+  const query = queryParams ? (queryParams.startsWith('?') ? queryParams : '?' + queryParams) : '';
+  if (isDev && !localPort) {
+    return `http://localhost:3002/${query}`;
   }
-  const indexPath = path.join(__dirname, '..', 'out', 'index.html');
-  return `file://${indexPath}${queryParams ? '?' + queryParams : ''}`;
+  return `http://127.0.0.1:${localPort}/${query}`;
 }
 
 /**
@@ -59,6 +147,7 @@ function createMainWindow() {
     title: 'Хомячок Диоген (Пиксельный 2D Тамагочи)',
     backgroundColor: '#181425',
     autoHideMenuBar: true,
+    icon: path.join(__dirname, 'icon.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
@@ -192,9 +281,9 @@ function switchAppMode(mode) {
  * Создание системного трея (иконки возле часов)
  */
 function createSystemTray() {
-  // Используем дефолтную иконку или фавикон
-  const iconPath = path.join(__dirname, '..', 'public', 'favicon.ico');
-  const validIcon = fs.existsSync(iconPath) ? iconPath : path.join(__dirname, 'tray_icon.png');
+  const iconPath = path.join(__dirname, 'tray_icon.png');
+  const fallbackIcon = path.join(__dirname, 'icon.png');
+  const validIcon = fs.existsSync(iconPath) ? iconPath : fallbackIcon;
 
   try {
     tray = new Tray(validIcon);
@@ -304,7 +393,7 @@ ipcMain.on('show-notification', (_event, { title, body }) => {
     new Notification({
       title: title || 'Хомячок Диоген',
       body: body || '',
-      icon: path.join(__dirname, '..', 'public', 'favicon.ico'),
+      icon: path.join(__dirname, 'icon.png'),
     }).show();
   }
 });
@@ -313,7 +402,13 @@ ipcMain.on('show-notification', (_event, { title, body }) => {
 // ЖИЗНЕННЫЙ ЦИКЛ ПРИЛОЖЕНИЯ
 // ----------------------------------------------------------------------------
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  try {
+    await startLocalServer();
+  } catch (err) {
+    console.error('[App] Ошибка запуска локального сервера:', err);
+  }
+
   createMainWindow();
   createSystemTray();
 
@@ -322,6 +417,14 @@ app.whenReady().then(() => {
       createMainWindow();
     }
   });
+});
+
+app.on('before-quit', () => {
+  if (localServer) {
+    try {
+      localServer.close();
+    } catch (_) {}
+  }
 });
 
 app.on('window-all-closed', () => {

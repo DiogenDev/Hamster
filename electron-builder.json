@@ -10,6 +10,7 @@
     "out/**/*",
     "package.json"
   ],
+  "compression": "normal",
   "win": {
     "target": [
       {

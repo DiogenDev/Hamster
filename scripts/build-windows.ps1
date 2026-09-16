@@ -1,5 +1,5 @@
 ﻿# ==============================================================================
-# Скрипт сборки Windows EXE (.exe) для игры "Хомячок Диоген"
+# Build Windows EXE (.exe) for Hamster Diogen
 # ==============================================================================
 
 $ErrorActionPreference = "Stop"
@@ -7,35 +7,43 @@ $ProjectDir = "D:\soft\HamsterDiogen"
 $ExeDest = Join-Path $ProjectDir "HamsterDiogen.exe"
 $DistDir = Join-Path $ProjectDir "dist"
 
-Write-Host "🐹 === НАЧАЛО СБОРКИ WINDOWS ИСПОЛНЯЕМОГО ФАЙЛА (.EXE) ===" -ForegroundColor Cyan
+Write-Host "=== BUILDING WINDOWS EXE (Hamster Diogen) ===" -ForegroundColor Cyan
 
-# 1. Экспорт статических ассетов Next.js
-Write-Host "`n[1/3] Сборка Next.js (Static Export)..." -ForegroundColor Yellow
+# 0. Kill previous running instances to prevent file locks
+Get-Process | Where-Object { $_.ProcessName -match "Hamster|Electron" } | Stop-Process -Force -ErrorAction SilentlyContinue
+
+# 1. Generate icon
+if (Test-Path "scripts\generate-icon.js") {
+    & cmd.exe /c "node scripts\generate-icon.js"
+}
+
+# 2. Export Next.js
+Write-Host "`n[1/3] Building Next.js static export..." -ForegroundColor Yellow
 Set-Location $ProjectDir
 & cmd.exe /c "npm.cmd run export"
 if ($LASTEXITCODE -ne 0) {
-    Write-Error "Ошибка сборки Next.js export."
+    Write-Error "Next.js export failed."
 }
 
-# 2. Упаковка через electron-builder
-Write-Host "`n[2/3] Упаковка портативного приложения через electron-builder..." -ForegroundColor Yellow
+# 3. Package with electron-builder
+Write-Host "`n[2/3] Packaging portable EXE with electron-builder..." -ForegroundColor Yellow
 & cmd.exe /c "npx.cmd electron-builder --win"
 if ($LASTEXITCODE -ne 0) {
-    Write-Error "Ошибка упаковки electron-builder."
+    Write-Error "electron-builder packaging failed."
 }
 
-# 3. Поиск и копирование готового EXE файла
-Write-Host "`n[3/3] Подготовка файла HamsterDiogen.exe..." -ForegroundColor Yellow
+# 4. Copy final EXE
+Write-Host "`n[3/3] Finalizing HamsterDiogen.exe..." -ForegroundColor Yellow
 $builtExe = Get-ChildItem -Path $DistDir -Filter "*.exe" -File | Sort-Object LastWriteTime -Descending | Select-Object -First 1
 
 if ($builtExe) {
     Copy-Item -Path $builtExe.FullName -Destination $ExeDest -Force
     $sizeMb = [math]::Round($builtExe.Length / 1MB, 2)
     Write-Host "`n========================================================" -ForegroundColor Green
-    Write-Host " УСПЕХ! Windows-версия успешно собрана!" -ForegroundColor Green
-    Write-Host " Файл: $ExeDest ($sizeMb МБ)" -ForegroundColor Cyan
-    Write-Host " Исходный билд: $($builtExe.FullName)" -ForegroundColor DarkGray
+    Write-Host " SUCCESS! Windows version built successfully!" -ForegroundColor Green
+    Write-Host " File: $ExeDest ($sizeMb MB)" -ForegroundColor Cyan
+    Write-Host " Source: $($builtExe.FullName)" -ForegroundColor DarkGray
     Write-Host "========================================================" -ForegroundColor Green
 } else {
-    Write-Error "Не удалось найти скомпилированный .exe файл в $DistDir"
+    Write-Error "Could not find built .exe in $DistDir"
 }
