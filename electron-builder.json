@@ -1,6 +1,7 @@
 {
   "appId": "com.hamster.diogen",
   "productName": "Хомячок Диоген",
+  "executableName": "HamsterDiogen",
   "copyright": "Copyright © 2026 DiogenDev",
   "directories": {
     "output": "dist"
@@ -13,6 +14,10 @@
   "compression": "normal",
   "win": {
     "target": [
+      {
+        "target": "dir",
+        "arch": ["x64"]
+      },
       {
         "target": "portable",
         "arch": ["x64"]

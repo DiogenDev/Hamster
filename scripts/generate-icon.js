@@ -1,4 +1,4 @@
-﻿const fs = require('fs');
+const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
 
@@ -107,16 +107,37 @@ function buildPng(targetSize, scale) {
   ]);
 }
 
+function createIco(pngBuf, size = 32) {
+  const header = Buffer.alloc(6);
+  header.writeUInt16LE(0, 0);
+  header.writeUInt16LE(1, 2);
+  header.writeUInt16LE(1, 4);
+
+  const entry = Buffer.alloc(16);
+  entry.writeUInt8(size, 0);
+  entry.writeUInt8(size, 1);
+  entry.writeUInt8(0, 2);
+  entry.writeUInt8(0, 3);
+  entry.writeUInt16LE(1, 4);
+  entry.writeUInt16LE(32, 6);
+  entry.writeUInt32LE(pngBuf.length, 8);
+  entry.writeUInt32LE(22, 12);
+
+  return Buffer.concat([header, entry, pngBuf]);
+}
+
 const png256 = buildPng(256, 8);
 const png32 = buildPng(32, 1);
+const ico = createIco(png32, 32);
 
 const publicDir = path.join(__dirname, '..', 'public');
 const electronDir = path.join(__dirname, '..', 'electron');
 if (!fs.existsSync(publicDir)) fs.mkdirSync(publicDir, { recursive: true });
 if (!fs.existsSync(electronDir)) fs.mkdirSync(electronDir, { recursive: true });
 
-fs.writeFileSync(path.join(publicDir, 'favicon.ico'), png256);
+fs.writeFileSync(path.join(publicDir, 'favicon.ico'), ico);
+fs.writeFileSync(path.join(electronDir, 'tray.ico'), ico);
 fs.writeFileSync(path.join(electronDir, 'icon.png'), png256);
 fs.writeFileSync(path.join(electronDir, 'tray_icon.png'), png32);
 
-console.log('Icons generated successfully: icon.png (256x256), tray_icon.png (32x32)');
+console.log('Icons generated successfully: icon.png (256x256), tray.ico (32x32)');

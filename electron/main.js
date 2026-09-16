@@ -22,6 +22,21 @@ if (process.platform === 'win32') {
   app.setAppUserModelId('com.hamster.diogen');
 }
 
+// Защита от параллельного запуска нескольких копий игры
+const gotTheLock = app.requestSingleInstanceLock();
+if (!gotTheLock) {
+  app.quit();
+  process.exit(0);
+} else {
+  app.on('second-instance', () => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.show();
+      mainWindow.focus();
+    }
+  });
+}
+
 let mainWindow = null;
 let petWindow = null;
 let wallpaperWindow = null;
@@ -147,6 +162,7 @@ function createMainWindow() {
     title: 'Хомячок Диоген (Пиксельный 2D Тамагочи)',
     backgroundColor: '#181425',
     autoHideMenuBar: true,
+    show: true,
     icon: path.join(__dirname, 'icon.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -156,6 +172,23 @@ function createMainWindow() {
   });
 
   mainWindow.loadURL(getAppUrl('mode=normal'));
+
+  mainWindow.webContents.on('console-message', (_event, level, message, line, sourceId) => {
+    console.log(`[Renderer L${level}] ${message} (${sourceId}:${line})`);
+  });
+
+  mainWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL) => {
+    console.error(`[Renderer ERROR] did-fail-load: ${errorCode} ${errorDescription} (${validatedURL})`);
+  });
+
+  mainWindow.webContents.on('did-finish-load', () => {
+    console.log('[Renderer] Page finished loading successfully');
+  });
+
+  mainWindow.once('ready-to-show', () => {
+    mainWindow.show();
+    mainWindow.focus();
+  });
 
   mainWindow.on('close', (e) => {
     // Если включен режим питомца на рабочем столе, скрываем главное окно вместо выхода
@@ -281,18 +314,24 @@ function switchAppMode(mode) {
  * Создание системного трея (иконки возле часов)
  */
 function createSystemTray() {
-  const iconPath = path.join(__dirname, 'tray_icon.png');
-  const fallbackIcon = path.join(__dirname, 'icon.png');
-  const validIcon = fs.existsSync(iconPath) ? iconPath : fallbackIcon;
+  const icoPath = path.join(__dirname, 'tray.ico');
+  const pngPath = path.join(__dirname, 'tray_icon.png');
+  const iconFile = fs.existsSync(icoPath) ? icoPath : (fs.existsSync(pngPath) ? pngPath : null);
+
+  if (!iconFile) return;
 
   try {
-    tray = new Tray(validIcon);
-    tray.setToolTip('Хомячок Диоген');
-    updateTrayMenu();
+    const { nativeImage } = require('electron');
+    const trayIcon = nativeImage.createFromPath(iconFile);
+    if (!trayIcon.isEmpty()) {
+      tray = new Tray(trayIcon);
+      tray.setToolTip('Хомячок Диоген');
+      updateTrayMenu();
 
-    tray.on('double-click', () => {
-      switchAppMode('normal');
-    });
+      tray.on('double-click', () => {
+        switchAppMode('normal');
+      });
+    }
   } catch (err) {
     console.warn('[Tray] Не удалось создать трей:', err);
   }
