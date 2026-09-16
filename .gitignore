@@ -46,6 +46,7 @@ dist/
 release/
 HamsterDiogen-Windows/
 *.exe
+*.zip
 .vs/
 *.suo
 *.user

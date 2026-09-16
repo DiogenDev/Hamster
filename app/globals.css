@@ -24,6 +24,20 @@ canvas,
   image-rendering: crisp-edges;
 }
 
+/* Прозрачный режим для окна хомячка на рабочем столе (Desktop Pet) */
+html.pet-mode,
+body.pet-mode,
+html.pet-mode body,
+body.pet-mode #__next,
+body.pet-mode main {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  border: none !important;
+  overflow: hidden !important;
+}
+
 /* Кастомный ретро-скроллбар */
 ::-webkit-scrollbar {
   width: 8px;

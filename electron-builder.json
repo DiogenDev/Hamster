@@ -11,6 +11,12 @@
     "out/**/*",
     "package.json"
   ],
+  "extraResources": [
+    {
+      "from": "electron/wallpaper-helper.exe",
+      "to": "wallpaper-helper.exe"
+    }
+  ],
   "compression": "normal",
   "win": {
     "target": [
@@ -19,10 +25,19 @@
         "arch": ["x64"]
       },
       {
-        "target": "portable",
+        "target": "nsis",
         "arch": ["x64"]
       }
     ],
-    "artifactName": "HamsterDiogen.${ext}"
+    "icon": "electron/icon.ico",
+    "artifactName": "HamsterDiogen-Setup.${ext}"
+  },
+  "nsis": {
+    "oneClick": true,
+    "perMachine": false,
+    "allowToChangeInstallationDirectory": false,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true,
+    "shortcutName": "Хомячок Диоген"
   }
 }

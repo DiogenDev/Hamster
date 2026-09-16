@@ -17,6 +17,15 @@ if (Test-Path "scripts\generate-icon.js") {
     & cmd.exe /c "node scripts\generate-icon.js"
 }
 
+# 1b. Compile Wallpaper Helper
+$cscPath = "C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
+$wpSource = Join-Path $ProjectDir "scripts\WallpaperHelper.cs"
+$wpDest = Join-Path $ProjectDir "electron\wallpaper-helper.exe"
+if ((Test-Path $cscPath) -and (Test-Path $wpSource)) {
+    & $cscPath /nologo /target:winexe /out:$wpDest $wpSource
+    Write-Host "Compiled wallpaper-helper.exe" -ForegroundColor Green
+}
+
 # 2. Export Next.js
 Write-Host "`n[1/3] Building Next.js static export..." -ForegroundColor Yellow
 Set-Location $ProjectDir
@@ -35,7 +44,7 @@ if ($LASTEXITCODE -ne 0) {
 # 4. Finalize release files
 Write-Host "`n[3/3] Finalizing Windows release..." -ForegroundColor Yellow
 
-# A. Unpacked instant-launch folder (starts in 0.2 seconds, no extraction delay!)
+# A. Unpacked instant-launch folder (starts in 0.1 seconds, no extraction delay!)
 $unpackedSrc = Join-Path $DistDir "win-unpacked"
 $unpackedDest = Join-Path $ProjectDir "HamsterDiogen-Windows"
 if (Test-Path $unpackedSrc) {
@@ -51,16 +60,26 @@ $batPath = Join-Path $ProjectDir "Run-Hamster.bat"
 "@echo off`r`nstart `"`" `"%~dp0HamsterDiogen-Windows\HamsterDiogen.exe`"" | Out-File -FilePath $batPath -Encoding ascii
 Write-Host " [One-Click Launcher] $batPath" -ForegroundColor Green
 
-# C. Standalone Portable EXE
-$builtExe = Get-ChildItem -Path $DistDir -Filter "*.exe" -File | Sort-Object LastWriteTime -Descending | Select-Object -First 1
-if ($builtExe) {
-    Copy-Item -Path $builtExe.FullName -Destination $ExeDest -Force
-    $sizeMb = [math]::Round($builtExe.Length / 1MB, 2)
-    Write-Host " [Portable File] $ExeDest ($sizeMb MB)" -ForegroundColor Cyan
+# C. Compile Native Instant Root Launcher (starts in 0.05s, no console window)
+$launcherSource = Join-Path $ProjectDir "scripts\Launcher.cs"
+if ((Test-Path $cscPath) -and (Test-Path $launcherSource)) {
+    & $cscPath /nologo /target:winexe /win32icon:electron\icon.ico /out:$ExeDest $launcherSource
+    Write-Host " [Native Instant Launcher] $ExeDest" -ForegroundColor Green
+}
+
+# D. NSIS Setup Installer
+$setupExe = Get-ChildItem -Path $DistDir -Filter "*Setup*.exe" -File | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+if ($setupExe) {
+    $setupDest = Join-Path $ProjectDir "HamsterDiogen-Setup.exe"
+    Copy-Item -Path $setupExe.FullName -Destination $setupDest -Force
+    $setupSizeMb = [math]::Round($setupExe.Length / 1MB, 2)
+    Write-Host " [Fast Installer] $setupDest ($setupSizeMb MB)" -ForegroundColor Cyan
 }
 
 Write-Host "`n========================================================" -ForegroundColor Green
 Write-Host " SUCCESS! Windows version built and ready!" -ForegroundColor Green
-Write-Host " Recommended: Run-Hamster.bat (starts instantly in 0.2s)" -ForegroundColor Yellow
-Write-Host " Portable: HamsterDiogen.exe" -ForegroundColor Cyan
+Write-Host " 1. HamsterDiogen.exe (Root launcher, instant 0.05s start!)" -ForegroundColor Yellow
+Write-Host " 2. Run-Hamster.bat (Batch launcher, instant start)" -ForegroundColor Yellow
+Write-Host " 3. HamsterDiogen-Setup.exe (Windows Installer)" -ForegroundColor Cyan
+Write-Host " 4. HamsterDiogen-Windows\HamsterDiogen.exe (Direct folder)" -ForegroundColor Green
 Write-Host "========================================================" -ForegroundColor Green

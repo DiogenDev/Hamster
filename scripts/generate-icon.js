@@ -109,35 +109,37 @@ function buildPng(targetSize, scale) {
 
 function createIco(pngBuf, size = 32) {
   const header = Buffer.alloc(6);
-  header.writeUInt16LE(0, 0);
-  header.writeUInt16LE(1, 2);
-  header.writeUInt16LE(1, 4);
+  header.writeUInt16LE(0, 0); // reserved
+  header.writeUInt16LE(1, 2); // image type (1 = ICO)
+  header.writeUInt16LE(1, 4); // number of images
 
   const entry = Buffer.alloc(16);
-  entry.writeUInt8(size, 0);
-  entry.writeUInt8(size, 1);
-  entry.writeUInt8(0, 2);
-  entry.writeUInt8(0, 3);
-  entry.writeUInt16LE(1, 4);
-  entry.writeUInt16LE(32, 6);
-  entry.writeUInt32LE(pngBuf.length, 8);
-  entry.writeUInt32LE(22, 12);
+  entry.writeUInt8(size === 256 ? 0 : size, 0); // 0 means 256
+  entry.writeUInt8(size === 256 ? 0 : size, 1); // 0 means 256
+  entry.writeUInt8(0, 2); // color palette
+  entry.writeUInt8(0, 3); // reserved
+  entry.writeUInt16LE(1, 4); // color planes
+  entry.writeUInt16LE(32, 6); // bits per pixel
+  entry.writeUInt32LE(pngBuf.length, 8); // image size in bytes
+  entry.writeUInt32LE(22, 12); // image data offset
 
   return Buffer.concat([header, entry, pngBuf]);
 }
 
 const png256 = buildPng(256, 8);
 const png32 = buildPng(32, 1);
-const ico = createIco(png32, 32);
+const ico32 = createIco(png32, 32);
+const ico256 = createIco(png256, 256);
 
 const publicDir = path.join(__dirname, '..', 'public');
 const electronDir = path.join(__dirname, '..', 'electron');
 if (!fs.existsSync(publicDir)) fs.mkdirSync(publicDir, { recursive: true });
 if (!fs.existsSync(electronDir)) fs.mkdirSync(electronDir, { recursive: true });
 
-fs.writeFileSync(path.join(publicDir, 'favicon.ico'), ico);
-fs.writeFileSync(path.join(electronDir, 'tray.ico'), ico);
+fs.writeFileSync(path.join(publicDir, 'favicon.ico'), ico32);
+fs.writeFileSync(path.join(electronDir, 'tray.ico'), ico32);
+fs.writeFileSync(path.join(electronDir, 'icon.ico'), ico256);
 fs.writeFileSync(path.join(electronDir, 'icon.png'), png256);
 fs.writeFileSync(path.join(electronDir, 'tray_icon.png'), png32);
 
-console.log('Icons generated successfully: icon.png (256x256), tray.ico (32x32)');
+console.log('Icons generated successfully: icon.png (256x256), icon.ico (256x256), tray.ico (32x32)');

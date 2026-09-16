@@ -81,8 +81,18 @@ export default function TamagotchiPage() {
     if (typeof window !== 'undefined') {
       const searchParams = new URLSearchParams(window.location.search);
       const m = searchParams.get('mode') as any;
-      if (m === 'pet' || m === 'wallpaper' || m === 'normal') {
+      if (m === 'pet' || m === 'wallpaper') {
         setAppMode(m);
+      } else {
+        setAppMode('normal');
+      }
+
+      // Слушаем смену режима от главного процесса Electron
+      if (window.electronAPI?.onModeChange) {
+        const unsubscribe = window.electronAPI.onModeChange((mode) => {
+          setAppMode(mode);
+        });
+        return () => unsubscribe();
       }
 
       const cam = localStorage.getItem('hamster_wallpaper_camera') as any;
@@ -467,9 +477,18 @@ export default function TamagotchiPage() {
 
   useEffect(() => {
     if (typeof document !== 'undefined') {
-      document.body.style.background = currentTheme.bodyBg;
+      if (appMode === 'pet') {
+        document.body.style.background = 'transparent';
+        document.body.style.backgroundColor = 'transparent';
+        document.body.classList.add('pet-mode');
+        document.documentElement.classList.add('pet-mode');
+      } else {
+        document.body.classList.remove('pet-mode');
+        document.documentElement.classList.remove('pet-mode');
+        document.body.style.background = currentTheme.bodyBg;
+      }
     }
-  }, [currentTheme.bodyBg]);
+  }, [currentTheme.bodyBg, appMode]);
 
   if (!isHydrated) {
     return (
@@ -703,9 +722,10 @@ export default function TamagotchiPage() {
         isOpen={isWindowsTutorialOpen}
         onClose={() => setIsWindowsTutorialOpen(false)}
         onSwitchMode={(m) => {
-          setAppMode(m);
-          if (window.electronAPI?.setMode) {
+          if (window.electronAPI) {
             window.electronAPI.setMode(m);
+          } else {
+            setAppMode(m);
           }
         }}
       />

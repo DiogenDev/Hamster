@@ -230,6 +230,7 @@ function createPetWindow() {
     y: initY,
     frame: false,
     transparent: true,
+    backgroundColor: '#00000000',
     alwaysOnTop: true,
     skipTaskbar: true,
     resizable: false,
@@ -250,11 +251,53 @@ function createPetWindow() {
   });
 }
 
+const { execFile } = require('child_process');
+
+function getWallpaperHelperPath() {
+  const candidates = [
+    path.join(process.resourcesPath || '', 'wallpaper-helper.exe'),
+    path.join(__dirname, 'wallpaper-helper.exe'),
+    path.join(process.cwd(), 'electron', 'wallpaper-helper.exe'),
+  ];
+  for (const p of candidates) {
+    if (fs.existsSync(p)) return p;
+  }
+  return null;
+}
+
+function attachWallpaperWindow() {
+  if (!wallpaperWindow || process.platform !== 'win32') return;
+
+  const helperPath = getWallpaperHelperPath();
+  if (!helperPath) {
+    console.warn('[Wallpaper] wallpaper-helper.exe не найден');
+    return;
+  }
+
+  try {
+    const hwndBuf = wallpaperWindow.getNativeWindowHandle();
+    const hwnd = process.arch === 'x64'
+      ? hwndBuf.readBigInt64LE(0).toString()
+      : hwndBuf.readInt32LE(0).toString();
+
+    execFile(helperPath, ['attach', hwnd], (err, stdout) => {
+      if (err) {
+        console.error('[Wallpaper] Ошибка закрепления под рабочий стол:', err);
+      } else {
+        console.log('[Wallpaper] Успешно закреплено под рабочий стол:', stdout);
+      }
+    });
+  } catch (e) {
+    console.error('[Wallpaper] Ошибка получения HWND:', e);
+  }
+}
+
 /**
  * Создание окна интерактивных обоев рабочего стола
  */
 function createWallpaperWindow() {
   if (wallpaperWindow) {
+    attachWallpaperWindow();
     wallpaperWindow.show();
     return;
   }
@@ -267,8 +310,9 @@ function createWallpaperWindow() {
     x: 0,
     y: 0,
     frame: false,
-    type: 'desktop',
+    show: false,
     skipTaskbar: true,
+    focusable: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
@@ -277,6 +321,11 @@ function createWallpaperWindow() {
   });
 
   wallpaperWindow.loadURL(getAppUrl('mode=wallpaper'));
+
+  wallpaperWindow.once('ready-to-show', () => {
+    attachWallpaperWindow();
+    wallpaperWindow.show();
+  });
 
   wallpaperWindow.on('closed', () => {
     wallpaperWindow = null;
@@ -291,20 +340,35 @@ function switchAppMode(mode) {
 
   if (mode === 'normal') {
     if (petWindow) petWindow.hide();
-    if (wallpaperWindow) wallpaperWindow.hide();
+    if (wallpaperWindow) {
+      wallpaperWindow.destroy();
+      wallpaperWindow = null;
+    }
     createMainWindow();
-    mainWindow.show();
-    mainWindow.focus();
+    if (mainWindow) {
+      mainWindow.webContents.send('mode-change', 'normal');
+      mainWindow.show();
+      mainWindow.focus();
+    }
   } else if (mode === 'pet') {
     if (mainWindow) mainWindow.hide();
-    if (wallpaperWindow) wallpaperWindow.hide();
+    if (wallpaperWindow) {
+      wallpaperWindow.destroy();
+      wallpaperWindow = null;
+    }
     createPetWindow();
-    petWindow.show();
+    if (petWindow) {
+      petWindow.webContents.send('mode-change', 'pet');
+      petWindow.show();
+    }
   } else if (mode === 'wallpaper') {
     if (mainWindow) mainWindow.hide();
     if (petWindow) petWindow.hide();
     createWallpaperWindow();
-    wallpaperWindow.show();
+    if (wallpaperWindow) {
+      wallpaperWindow.webContents.send('mode-change', 'wallpaper');
+      attachWallpaperWindow();
+    }
   }
 
   updateTrayMenu();
