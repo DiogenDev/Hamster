@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Хомячок Диоген</string>
+    <string name="title_activity_main">Хомячок Диоген</string>
+    <string name="package_name">com.hamster.diogen</string>
+    <string name="custom_url_scheme">com.hamster.diogen</string>
+</resources>

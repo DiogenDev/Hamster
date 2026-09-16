@@ -46,6 +46,23 @@ export const DEFAULT_SAVE_DATA: TamagotchiSaveData = {
     house: 'log_cabin',
     bowlFoodLevel: 80,
     currentFoodId: 'sunflower_seeds',
+    bottleWaterLevel: 100,
+    currentDrinkId: 'fresh_water',
+    drinkColor: '#38bdf8',
+    positions: {
+      houseX: 98,
+      houseY: 78,
+      wheelX: 56,
+      wheelY: 86,
+      bowlX: 412,
+      bowlY: 122,
+      bottleX: 246,
+      bottleY: 38,
+      floor2ToyX: 235,
+      floor2ToyY: -28,
+      floor3ToyX: 145,
+      floor3ToyY: -208,
+    },
   },
   poops: [],
   lastSavedTimestamp: Date.now(),
@@ -60,6 +77,21 @@ export const DEFAULT_SAVE_DATA: TamagotchiSaveData = {
     hygiene: false,
     happiness: false,
     health: false,
+  },
+  themeId: 'retro_arcade',
+  musicConfig: {
+    isPlaying: false,
+    currentTrackIndex: 0,
+    volume: 0.35,
+    mode: 'loop',
+  },
+  cageColor: 'silver',
+  tunnelColor: 'neon_cyan',
+  tunnelTexture: 'smooth_glass',
+  floorStyle: 'natural_oak',
+  tierToys: {
+    floor2Toy: 'seesaw',
+    floor3Toy: 'telescope',
   },
 };
 
@@ -99,6 +131,7 @@ export function calculateOfflineProgress(
   let energyChange = 0;
   let hygieneLost = 0;
   let newPoopsCount = 0;
+  let updatedBehavior = savedData.behavior;
   const newPoops: PoopItem[] = [...savedData.poops];
 
   if (!isZen) {
@@ -110,14 +143,38 @@ export function calculateOfflineProgress(
       currentNeeds.hunger = 100;
     }
 
-    // 2. Энергия
+    // 2. Энергия (Баг-фикс: хомячок гарантированно восстанавливает силы во время сна в оффлайне)
     if (!disabled.energy) {
       if (savedData.behavior === HamsterBehavior.SLEEP) {
-        energyChange = Math.floor(deltaSeconds / 20);
+        // Хомячок сладко спал в домике: быстрое восстановление сил (+1% каждые 15 сек)
+        energyChange = Math.floor(deltaSeconds / 15);
         currentNeeds.energy = Math.min(100, currentNeeds.energy + energyChange);
+        // Если выспался до 100%, переходит в бодрствование
+        if (currentNeeds.energy >= 100) {
+          updatedBehavior = HamsterBehavior.IDLE;
+        } else {
+          updatedBehavior = HamsterBehavior.SLEEP;
+        }
       } else {
-        energyChange = -Math.floor(deltaSeconds / 35);
-        currentNeeds.energy = Math.max(5, currentNeeds.energy + energyChange);
+        // Если хомячок не спал при закрытии браузера:
+        // Рассчитываем, сколько времени прошло до естественного засыпания (< 20% энергии)
+        const secondsToExhaustion = Math.max(0, (savedData.needs.energy - 20) * 35);
+        if (deltaSeconds > secondsToExhaustion + 60) {
+          // Хомячок устал за время отсутствия, залез в домик и проспал остаток времени
+          const sleepDuration = deltaSeconds - secondsToExhaustion;
+          const energyRecovered = Math.floor(sleepDuration / 15);
+          currentNeeds.energy = Math.min(100, 20 + energyRecovered);
+          energyChange = currentNeeds.energy - savedData.needs.energy;
+          if (currentNeeds.energy >= 100) {
+            updatedBehavior = HamsterBehavior.IDLE;
+          } else {
+            updatedBehavior = HamsterBehavior.SLEEP;
+          }
+        } else {
+          // Короткое отсутствие без засыпания
+          energyChange = -Math.floor(deltaSeconds / 35);
+          currentNeeds.energy = Math.max(5, currentNeeds.energy + energyChange);
+        }
       }
     } else {
       currentNeeds.energy = 100;
@@ -168,6 +225,7 @@ export function calculateOfflineProgress(
 
   const updatedData: TamagotchiSaveData = {
     ...savedData,
+    behavior: updatedBehavior,
     needs: currentNeeds,
     poops: newPoops,
     lastSavedTimestamp: nowMs,
@@ -197,6 +255,17 @@ export function useSafeStorage() {
   const dataRef = useRef<TamagotchiSaveData>(DEFAULT_SAVE_DATA);
   dataRef.current = data;
 
+  const updateData = useCallback(
+    (updater: TamagotchiSaveData | ((prev: TamagotchiSaveData) => TamagotchiSaveData)) => {
+      setData((prev) => {
+        const next = typeof updater === 'function' ? updater(prev) : updater;
+        dataRef.current = next;
+        return next;
+      });
+    },
+    []
+  );
+
   useEffect(() => {
     try {
       // Поддержка миграции v1 -> v2 если ключ v2 еще не существует
@@ -210,21 +279,45 @@ export function useSafeStorage() {
         const merged: TamagotchiSaveData = {
           ...DEFAULT_SAVE_DATA,
           ...parsed,
+          furniture: {
+            ...DEFAULT_SAVE_DATA.furniture,
+            ...(parsed.furniture || {}),
+            positions: {
+              ...(DEFAULT_SAVE_DATA.furniture.positions || {}),
+              ...(parsed.furniture?.positions || {}),
+            },
+            bottleWaterLevel: parsed.furniture?.bottleWaterLevel ?? 100,
+            currentDrinkId: parsed.furniture?.currentDrinkId ?? 'fresh_water',
+            drinkColor: parsed.furniture?.drinkColor ?? '#38bdf8',
+          },
           disabledStats: {
             ...DEFAULT_SAVE_DATA.disabledStats,
             ...(parsed.disabledStats || {}),
           },
+          themeId: parsed.themeId || DEFAULT_SAVE_DATA.themeId,
+          musicConfig: {
+            ...DEFAULT_SAVE_DATA.musicConfig,
+            ...(parsed.musicConfig || {}),
+          },
+          floorStyle: parsed.floorStyle || DEFAULT_SAVE_DATA.floorStyle,
+          tierToys: {
+            ...DEFAULT_SAVE_DATA.tierToys!,
+            ...(parsed.tierToys || {}),
+          },
         };
         const { updatedData, report } = calculateOfflineProgress(merged, Date.now());
+        dataRef.current = updatedData;
         setData(updatedData);
         if (report && report.deltaSeconds > 60 && !report.isZen) {
           setOfflineReport(report);
         }
       } else {
+        dataRef.current = DEFAULT_SAVE_DATA;
         setData(DEFAULT_SAVE_DATA);
       }
     } catch (err) {
       console.error('[useSafeStorage] Ошибка считывания localStorage:', err);
+      dataRef.current = DEFAULT_SAVE_DATA;
       setData(DEFAULT_SAVE_DATA);
     } finally {
       setIsHydrated(true);
@@ -287,7 +380,7 @@ export function useSafeStorage() {
 
   return {
     data,
-    setData,
+    setData: updateData,
     isHydrated,
     offlineReport,
     clearOfflineReport: () => setOfflineReport(null),

@@ -5,6 +5,7 @@
  */
 
 import { HamsterPalette, PixelGrid } from '@/types/hamster';
+import { drawPixelEmoji } from '@/utils/pixelEmoji';
 
 export function drawPixelRect(
   ctx: CanvasRenderingContext2D,
@@ -30,6 +31,7 @@ export function drawCharacterMatrix(
   pixelSize: number = 2,
   flipX: boolean = false
 ) {
+  if (!matrix || !Array.isArray(matrix) || matrix.length === 0) return;
   const rows = matrix.length;
   const cols = matrix[0]?.length || 0;
 
@@ -49,8 +51,10 @@ export function drawCharacterMatrix(
         case 'E': color = palette.eyes; break;
         case 'H': color = palette.eyeHighlight; break;
         case 'C': color = palette.cheeks; break;
-        case 'W': color = '#e2e8f0'; break; // Усики
+        case 'W': color = '#ffffff'; break; // Усики / блики
         case 'S': color = '#d97706'; break; // Зернышко
+        case 'J': color = '#38bdf8'; break; // Капля воды/сока
+        case 'U': color = palette.paws || palette.pink; break; // Лапки
         default: color = null;
       }
 
@@ -173,11 +177,14 @@ export function drawPixelSpeechBubble(
   ctx.fillRect(bx + 1, by, bubbleW - 2, bubbleH);
   ctx.fillRect(centerX - 1, by + bubbleH, 2, 3);
 
-  // Эмодзи
-  ctx.font = '14px sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(emoji, centerX, by + bubbleH / 2 + 1);
+  // Пиксельный эмодзи
+  const rendered = drawPixelEmoji(ctx, emoji, centerX, by + bubbleH / 2, 1.2, opacity);
+  if (!rendered) {
+    ctx.font = '12px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(emoji, centerX, by + bubbleH / 2 + 1);
+  }
 
   ctx.restore();
 }

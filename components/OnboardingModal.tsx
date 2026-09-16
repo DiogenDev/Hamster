@@ -21,7 +21,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { HAMSTER_PALETTES, HAMSTER_24_IDLE_1 } from '@/utils/spritePresets';
+import { HAMSTER_PALETTES, HAMSTER_24_IDLE_1 } from '@/utils/hamsterSprites';
 import { HamsterPalette } from '@/types/hamster';
 import { drawCharacterMatrix } from '@/utils/canvasUtils';
 import { soundManager } from '@/utils/soundEffects';

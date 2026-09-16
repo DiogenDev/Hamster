@@ -1,51 +1,23 @@
 /**
  * ============================================================================
- * МОДУЛЬ ТИПИЗАЦИИ: ПИКСЕЛЬНЫЙ 2D ТАМАГОЧИ "ХОМЯЧОК" (V2 ПАНОРАМНЫЙ И ДЗЕН)
- * ============================================================================
- * 
- * 🎓 ИНТЕРАКТИВНЫЙ УЧЕБНИК: АРХИТЕКТУРНОЕ ОБОСНОВАНИЕ
- * ----------------------------------------------------------------------------
- * 1. ЗАЧЕМ ЭТО НУЖНО (Architectural Reason):
- *    Расширение конечного автомата (FSM) новыми состояниями (WHEEL, GROOM, SNIFF)
- *    и добавление режима "Дзен / Браузерный компаньон" требует строгой типизации
- *    конфигурации отключения статов.
- *    Это позволяет игроку настраивать геймплей под себя:
- *    от классического хардкорного тамагочи до расслабляющего живого виджета в углу экрана.
- * 
- * 2. НОВЫЕ ПОВЕДЕНИЯ:
- *    - `WHEEL`: Хомячок запрыгивает в беговое колесо и накручивает круги (колесо вращается).
- *    - `GROOM`: Хомячок садится на задние лапки и протирает мордочку и ушки передними лапками.
- *    - `SNIFF`: Принюхивается к опилкам, ищет зарытые семечки.
+ * МОДУЛЬ ТИПИЗАЦИИ: ПИКСЕЛЬНЫЙ 2D ТАМАГОЧИ "ХОМЯЧОК" (V3 ТЕМЫ И МУЗЫКА)
  * ============================================================================
  */
 
-/**
- * Конечное множество поведений хомячка (Finite State Machine).
- */
 export enum HamsterBehavior {
-  /** Спокойно сидит или стоит, шевелит носиком, ушками и моргает */
   IDLE = 'IDLE',
-  /** Блуждает по дну клетки влево/вправо с поворотом спрайта по ходу движения */
   WALK = 'WALK',
-  /** Расслабленно лежит на брюшке, восстанавливает дыхание */
   LAYING = 'LAYING',
-  /** Спит клубочком, над головой поднимаются пиксельные 'Zzz', восстанавливает энергию */
   SLEEP = 'SLEEP',
-  /** Держит лапками еду из кормушки, активно жует, надувает щечки */
   EATING = 'EATING',
-  /** Присаживается в уголок клетки, оставляет спрайт какашки (требует уборки) */
+  DRINKING = 'DRINKING',
   POOPING = 'POOPING',
-  /** Бежит внутри вращающегося колеса */
   WHEEL = 'WHEEL',
-  /** Мило умывает мордочку и ушки передними лапками */
   GROOM = 'GROOM',
-  /** Принюхивается к опилкам и исследует пол */
   SNIFF = 'SNIFF',
+  PLAYING_TOY = 'PLAYING_TOY',
 }
 
-/**
- * Физиологические показатели хомяка (Диапазон: 0 .. 100).
- */
 export interface HamsterNeeds {
   hunger: number;
   energy: number;
@@ -54,51 +26,132 @@ export interface HamsterNeeds {
   health: number;
 }
 
-/**
- * Конфигурация отключения статов для режима "Без забот"
- */
 export interface DisabledStatsConfig {
-  /** Отключить голод (всегда 100%, кормить можно только ради удовольствия) */
   hunger: boolean;
-  /** Отключить усталость (энергия не падает) */
   energy: boolean;
-  /** Отключить загрязнение (гигиена всегда 100%, какашки не появляются) */
   hygiene: boolean;
-  /** Отключить падение настроения */
   happiness: boolean;
-  /** Отключить болезни и урон здоровью */
   health: boolean;
 }
 
-/**
- * Доступные виды кормушек в клетке
- */
-export type BowlType = 'clay' | 'wood' | 'neon' | 'royal';
+export type BowlType =
+  | 'clay'
+  | 'wood'
+  | 'neon'
+  | 'royal'
+  | 'coconut_shell'
+  | 'watermelon'
+  | 'leaf_plate'
+  | 'space_tray'
+  | 'heart_ceramic'
+  | 'golden_acorn'
+  | 'cat_dish'
+  | 'crystal_geode'
+  | 'vintage_tea_saucer'
+  | 'bamboo_trough'
+  | 'cookie_bowl'
+  | 'pumpkin_bowl'
+  | 'lava_stone'
+  | 'ice_chalice'
+  | 'magic_cauldron'
+  | 'cheese_plate';
 
-/**
- * Доступные виды поилок
- */
-export type WaterBottleType = 'ball' | 'flask' | 'fountain';
+export type WaterBottleType =
+  | 'ball'
+  | 'flask'
+  | 'fountain'
+  | 'bamboo_drip'
+  | 'cyber_tube'
+  | 'honey_drop'
+  | 'potion_bottle'
+  | 'dew_leaf'
+  | 'cloud_rain'
+  | 'space_hydration'
+  | 'crystal_stalactite'
+  | 'vintage_teapot'
+  | 'baby_bottle'
+  | 'soda_dispenser'
+  | 'rainbow_flask'
+  | 'acorn_canteen'
+  | 'plasma_cooler'
+  | 'magic_chalice'
+  | 'spring_well'
+  | 'zen_bamboo_stream';
+export type HouseType =
+  | 'log_cabin'
+  | 'mushroom_cottage'
+  | 'coconut_hut'
+  | 'cardboard_fort'
+  | 'stone_castle'
+  | 'gingerbread_house'
+  | 'teapot_manor'
+  | 'swiss_cheese'
+  | 'acorn_villa'
+  | 'japanese_pagoda'
+  | 'cyber_bunker'
+  | 'strawberry_loft'
+  | 'pumpkin_shack'
+  | 'ice_igloo'
+  | 'cactus_ranch'
+  | 'retro_tv'
+  | 'flower_pot'
+  | 'honeycomb_hive'
+  | 'space_capsule'
+  | 'crystal_cave'
+  | 'coconut'
+  | 'mushroom'
+  | 'box';
 
-/**
- * Доступные виды домиков
- */
-export type HouseType = 'log_cabin' | 'coconut' | 'mushroom' | 'box';
+export type WheelType =
+  | 'classic'
+  | 'wood_spoke'
+  | 'cyber_neon'
+  | 'golden_sun'
+  | 'donut'
+  | 'rainbow'
+  | 'flower_daisy'
+  | 'space_gyro'
+  | 'racing_tire'
+  | 'crystal_spinner'
+  | 'candy_peppermint'
+  | 'bubble_aqua'
+  | 'steampunk_gear'
+  | 'galaxy_spiral'
+  | 'watermelon_spin'
+  | 'clockwork'
+  | 'cheese_wheel'
+  | 'lava_vortex'
+  | 'acorn_spinner'
+  | 'zen_bamboo';
 
-/**
- * Конфигурация мебели и окружения в клетке
- */
+export interface FurniturePositions {
+  houseX: number;
+  houseY: number;
+  wheelX: number;
+  wheelY: number;
+  bowlX: number;
+  bowlY: number;
+  bottleX: number;
+  bottleY: number;
+  floor2ToyX?: number;
+  floor2ToyY?: number;
+  floor3ToyX?: number;
+  floor3ToyY?: number;
+}
+
 export interface FurnitureConfig {
   bowl: BowlType;
   waterBottle: WaterBottleType;
   house: HouseType;
+  wheel?: WheelType;
+  positions?: Partial<FurniturePositions>;
   bowlFoodLevel: number;
   currentFoodId: string | null;
+  bottleWaterLevel?: number; // 0..100%
+  currentDrinkId?: string | null;
+  drinkColor?: string; // hex color of current drink/juice/water
 }
 
-/**
- * Описание вида корма в рационе питания
- */
 export interface FoodItem {
   id: string;
   name: string;
@@ -110,42 +163,37 @@ export interface FoodItem {
   eatingDurationSec: number;
 }
 
-/**
- * Цветовая дизайнерская палитра хомяка с поддержкой 2x детализации
- */
+export interface DrinkItem {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  liquidColor: string;
+  hungerGain: number;
+  energyGain: number;
+  happinessGain: number;
+  healthGain: number;
+  drinkingDurationSec: number;
+}
+
 export interface HamsterPalette {
   id: string;
   name: string;
   nameEn: string;
   description: string;
-  /** Основной цвет шерсти */
   fur: string;
-  /** Теневой контур шерсти для объема */
   furDark: string;
-  /** Светлый блик шерсти для объемного 2x меха */
   furLight?: string;
-  /** Цвет животика и грудки */
   belly: string;
-  /** Внутренняя часть ушек и носик */
   pink: string;
-  /** Цвет глаз */
   eyes: string;
-  /** Блик на глазах */
   eyeHighlight: string;
-  /** Румянец на щечках */
   cheeks: string;
-  /** Цвет лапок */
   paws: string;
 }
 
-/**
- * Двумерная сетка пикселей для редактора спрайтов.
- */
 export type PixelGrid = (string | null)[][];
 
-/**
- * Структура кастомного спрайта
- */
 export interface CustomSpriteData {
   id: string;
   name: string;
@@ -156,9 +204,6 @@ export interface CustomSpriteData {
   createdAt: number;
 }
 
-/**
- * Спрайт какашки на дне клетки
- */
 export interface PoopItem {
   id: string;
   x: number;
@@ -166,21 +211,53 @@ export interface PoopItem {
   createdAt: number;
 }
 
-/**
- * Всплывающее эмоциональное облачко
- */
 export interface EmoteBubble {
   id: string;
-  emoji: '💖' | '💤' | '🌾' | '💩' | '⚡' | '⚠️' | '💧' | '✨' | '🎡' | '🧼' | '🌸';
+  emoji:
+    | '💖'
+    | '💤'
+    | '🌾'
+    | '💩'
+    | '⚡'
+    | '⚠️'
+    | '💧'
+    | '✨'
+    | '🎡'
+    | '🧼'
+    | '🌸'
+    | '🎵'
+    | '☀️'
+    | '🏠'
+    | '🤤'
+    | '🍔'
+    | '😮'
+    | '🚇'
+    | '🌟'
+    | '🧃'
+    | '🥤'
+    | '🥕'
+    | '🍎'
+    | '🍓'
+    | '🥛'
+    | '🍇'
+    | '🥦'
+    | '🥒'
+    | '🫐'
+    | '🍑'
+    | '🌰'
+    | '🧀'
+    | '🥜'
+    | '🍪'
+    | '🍉'
+    | '🍌'
+    | '🌻'
+    | string;
   createdAt: number;
   durationMs: number;
   offsetY: number;
   opacity: number;
 }
 
-/**
- * Пиксельная частица
- */
 export interface Particle {
   id: string;
   x: number;
@@ -195,7 +272,61 @@ export interface Particle {
 }
 
 /**
- * Полное состояние игры Тамагочи, сохраняемое в localStorage.
+ * Идентификаторы тем оформления приложения
+ */
+export type AppThemeId =
+  | 'retro_arcade'
+  | 'gameboy_classic'
+  | 'cyberpunk_neon'
+  | 'cozy_autumn'
+  | 'pastel_dream'
+  | 'midnight_synth';
+
+/**
+ * Конфигурация цветовой темы всего интерфейса
+ */
+export interface AppTheme {
+  id: AppThemeId;
+  name: string;
+  nameEn: string;
+  icon: string;
+  bodyBg: string;
+  consoleBg: string;
+  consoleBorder: string;
+  cardBg: string;
+  headerColor: string;
+  accentColor: string;
+}
+
+/**
+ * Режим воспроизведения фоновой музыки
+ */
+export type PlaybackMode = 'loop' | 'shuffle' | 'sequential';
+
+/**
+ * Настройки 8-битной фоновой музыки
+ */
+export interface MusicConfig {
+  isPlaying: boolean;
+  currentTrackIndex: number;
+  volume: number;
+  mode: PlaybackMode;
+}
+
+/**
+ * Описание музыкального трека
+ */
+export interface MusicTrack {
+  id: number;
+  title: string;
+  titleEn: string;
+  mood: string;
+  tempo: number; // BPM
+  durationSec: number;
+}
+
+/**
+ * Полное состояние игры Тамагочи, сохраняемое в localStorage
  */
 export interface TamagotchiSaveData {
   petName: string;
@@ -210,10 +341,111 @@ export interface TamagotchiSaveData {
   isOnboarded: boolean;
   soundEnabled: boolean;
   soundVolume: number;
-  /** Режим «Дзен» (все заботы отключены, чистый компаньон) */
   zenMode: boolean;
-  /** Точечное отключение статов */
   disabledStats: DisabledStatsConfig;
+  /** Выбранная тема оформления приложения */
+  themeId: AppThemeId;
+  /** Настройки музыки */
+  musicConfig: MusicConfig;
+  /** Принудительный выбор яруса клетки в Dev/Admin режиме (1, 2, 3) */
+  adminCageTierOverride?: CageTier | null;
+  /** Выбранный цвет прутьев и каркаса клетки */
+  cageColor?: CageColorId;
+  /** Выбранный цвет акриловых прозрачных туннелей */
+  tunnelColor?: TunnelColorId;
+  /** Выбранная текстура/узор акриловых туннелей */
+  tunnelTexture?: TunnelTextureId;
+  /** Выбранный стиль/материал покрытия пола 2 и 3 этажей */
+  floorStyle?: FloorStyleId;
+  /** Выбранные игрушки для 2-го и 3-го этажей */
+  tierToys?: TierToysConfig;
+}
+
+export type CageTier = 1 | 2 | 3;
+
+/**
+ * Идентификаторы расцветок клетки (прутья, каркас, акценты поддона)
+ */
+export type CageColorId =
+  | 'silver'
+  | 'gold'
+  | 'cyber_cyan'
+  | 'midnight_black'
+  | 'rose_pastel'
+  | 'emerald'
+  | 'violet'
+  | 'pure_white';
+
+/**
+ * Идентификаторы расцветок акриловых прозрачных туннелей
+ */
+export type TunnelColorId =
+  | 'neon_cyan'
+  | 'hot_pink'
+  | 'solar_orange'
+  | 'emerald_lime'
+  | 'cosmic_purple'
+  | 'crystal_clear'
+  | 'ruby_red'
+  | 'electric_yellow';
+
+/**
+ * Идентификаторы текстур и визуальных узоров для диагональных туннелей
+ */
+export type TunnelTextureId =
+  | 'smooth_glass'
+  | 'spiral_candy'
+  | 'ribbed_rings'
+  | 'star_glitter'
+  | 'honeycomb_cyber'
+  | 'hazard_chevrons'
+  | 'bubble_plastic'
+  | 'circuit_board';
+
+/**
+ * Идентификаторы отделочных материалов/покрытий полов 2-го и 3-го этажей
+ */
+export type FloorStyleId =
+  | 'natural_oak'
+  | 'soft_fleece'
+  | 'ceramic_mosaic'
+  | 'bamboo_tatami'
+  | 'cyber_circuit'
+  | 'royal_marble'
+  | 'candy_pastels'
+  | 'cheese_board';
+
+/**
+ * Идентификаторы игрушек для 2-го этажа (Мезонин)
+ */
+export type Floor2ToyId =
+  | 'seesaw'
+  | 'hammock'
+  | 'wood_chew'
+  | 'cardboard_tunnel';
+
+/**
+ * Идентификаторы игрушек для 3-го этажа (Пентхаус)
+ */
+export type Floor3ToyId =
+  | 'telescope'
+  | 'sand_bath'
+  | 'saucer_spinner'
+  | 'plush_throne';
+
+export interface TierToysConfig {
+  floor2Toy: Floor2ToyId;
+  floor3Toy: Floor3ToyId;
+}
+
+export interface TunnelTransitionState {
+  active: boolean;
+  fromFloor: 1 | 2 | 3;
+  toFloor: 1 | 2 | 3;
+  progress: number; // 0..1
+  opacity: number; // 0..1 (fading in / fading out)
+  tunnelIndex: 1 | 2; // 1: floor 1 <-> 2, 2: floor 2 <-> 3
 }
 
 export type PixelEditorTool = 'pencil' | 'eraser' | 'fill' | 'dropper';
+
