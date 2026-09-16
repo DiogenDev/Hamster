@@ -1,0 +1,22 @@
+{
+  "appId": "com.hamster.diogen",
+  "productName": "Хомячок Диоген",
+  "copyright": "Copyright © 2026 DiogenDev",
+  "directories": {
+    "output": "dist"
+  },
+  "files": [
+    "electron/**/*",
+    "out/**/*",
+    "package.json"
+  ],
+  "win": {
+    "target": [
+      {
+        "target": "portable",
+        "arch": ["x64"]
+      }
+    ],
+    "artifactName": "HamsterDiogen.${ext}"
+  }
+}

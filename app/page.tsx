@@ -48,6 +48,8 @@ import {
   notifyHamsterNeed,
   scheduleFutureNeedNotification,
 } from '@/utils/notificationService';
+import { DesktopPetOverlay } from '@/components/DesktopPetOverlay';
+import { WindowsTutorialModal } from '@/components/WindowsTutorialModal';
 
 export default function TamagotchiPage() {
   const {
@@ -67,6 +69,36 @@ export default function TamagotchiPage() {
   const [settingsInitialTab, setSettingsInitialTab] = useState<SettingsTab>('themes');
   const [ageSeconds, setAgeSeconds] = useState<number>(data.totalAgeSeconds);
   const [isShortScreen, setIsShortScreen] = useState<boolean>(false);
+
+  // Режимы Windows (Окно, Питомец на рабочем столе, Обои)
+  const [appMode, setAppMode] = useState<'normal' | 'pet' | 'wallpaper'>('normal');
+  const [isWindowsTutorialOpen, setIsWindowsTutorialOpen] = useState<boolean>(false);
+  const [wallpaperCamera, setWallpaperCamera] = useState<'all' | 'follow'>('follow');
+  const [wallpaperScale, setWallpaperScale] = useState<number>(100);
+  const [btnOpacity, setBtnOpacity] = useState<number>(70);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const searchParams = new URLSearchParams(window.location.search);
+      const m = searchParams.get('mode') as any;
+      if (m === 'pet' || m === 'wallpaper' || m === 'normal') {
+        setAppMode(m);
+      }
+
+      const cam = localStorage.getItem('hamster_wallpaper_camera') as any;
+      if (cam) setWallpaperCamera(cam);
+      const sc = Number(localStorage.getItem('hamster_wallpaper_scale') || 100);
+      if (sc) setWallpaperScale(sc);
+      const op = Number(localStorage.getItem('hamster_wallpaper_opacity') || 70);
+      if (op) setBtnOpacity(op);
+
+      const isElectron = !!window.electronAPI?.isElectron;
+      const seen = localStorage.getItem('hamster_win_tutorial_seen');
+      if (isElectron && !seen && m !== 'pet') {
+        setIsWindowsTutorialOpen(true);
+      }
+    }
+  }, []);
 
   useEffect(() => {
     const check = () => {
@@ -449,13 +481,20 @@ export default function TamagotchiPage() {
     );
   }
 
+  if (appMode === 'pet') {
+    return <DesktopPetOverlay />;
+  }
+
   return (
     <main className="w-full h-full max-h-[100dvh] max-w-4xl mx-auto flex flex-col justify-between items-center overflow-hidden p-1 sm:p-3 relative select-none">
       {/* Динамический нестатичный пиксельный задний фон, зависящий от темы */}
       <DynamicPixelBackdrop themeId={data.themeId || 'retro_arcade'} />
 
       {/* CARD 1: ВЕРХНЯЯ ПАНЕЛЬ (Шапка + HUD Статов) — shrink-0, динамически наверху */}
-      <div className="w-full shrink-0 z-20 max-w-3xl mx-auto flex flex-col pt-[env(safe-area-inset-top,2px)]">
+      <div
+        className="w-full shrink-0 z-20 max-w-3xl mx-auto flex flex-col pt-[env(safe-area-inset-top,2px)] transition-opacity duration-300"
+        style={appMode === 'wallpaper' ? { opacity: btnOpacity / 100 } : undefined}
+      >
         {/* Шапка: адаптивная для смартфона и десктопа */}
         <header className="flex w-full items-center justify-between mb-1 px-1">
           <h1
@@ -466,6 +505,20 @@ export default function TamagotchiPage() {
           </h1>
 
           <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                soundManager.playClickSound();
+                setIsWindowsTutorialOpen(true);
+              }}
+              className="px-2 sm:px-2.5 py-0.5 sm:py-1 bg-retro-blue/80 hover:bg-retro-blue border border-retro-yellow/70 hover:border-retro-yellow rounded text-[7px] sm:text-[9px] text-retro-yellow font-pixel flex items-center gap-1 shadow-pixel-sm transition-all active:translate-y-0.5"
+              title="ПК-режимы: Питомец на рабочем столе и Живые обои"
+            >
+              <span>💻</span>
+              <span className="hidden sm:inline">ПК-Режимы</span>
+              <span className="sm:hidden">ПК</span>
+            </button>
+
             <button
               type="button"
               onClick={() => {
@@ -507,7 +560,10 @@ export default function TamagotchiPage() {
       </div>
 
       {/* CARD 2: ЦЕНТРАЛЬНАЯ ЗОНА (Клетка) — flex-1 min-h-0, динамически занимает все доступное место */}
-      <div className="flex-1 min-h-0 w-full flex items-center justify-center my-auto transition-all duration-300 bg-transparent p-0.5 sm:p-1 max-w-4xl overflow-hidden">
+      <div
+        className="flex-1 min-h-0 w-full flex items-center justify-center my-auto transition-all duration-300 bg-transparent p-0.5 sm:p-1 max-w-4xl overflow-hidden"
+        style={appMode === 'wallpaper' ? { transform: `scale(${wallpaperScale / 100})`, transformOrigin: 'center center' } : undefined}
+      >
         <CageCanvas
           palette={currentPalette}
           customSprite={data.customSprite}
@@ -546,7 +602,10 @@ export default function TamagotchiPage() {
       </div>
 
       {/* CARD 3: НИЖНЯЯ ПАНЕЛЬ ДЕЙСТВИЙ — shrink-0, динамически прижата к низу экрана */}
-      <div className="w-full shrink-0 z-20 max-w-3xl mx-auto pb-[calc(env(safe-area-inset-bottom,2px)+2px)] pt-0.5">
+      <div
+        className="w-full shrink-0 z-20 max-w-3xl mx-auto pb-[calc(env(safe-area-inset-bottom,2px)+2px)] pt-0.5 transition-opacity duration-300"
+        style={appMode === 'wallpaper' ? { opacity: btnOpacity / 100 } : undefined}
+      >
         <ActionToolbar
           behavior={behavior}
           poopCount={poops.length}
@@ -638,6 +697,17 @@ export default function TamagotchiPage() {
         currentFurniture={data.furniture}
         onSave={handleSaveCageDesign}
         onPlayWithToy={(floor) => playWithToy(floor)}
+      />
+
+      <WindowsTutorialModal
+        isOpen={isWindowsTutorialOpen}
+        onClose={() => setIsWindowsTutorialOpen(false)}
+        onSwitchMode={(m) => {
+          setAppMode(m);
+          if (window.electronAPI?.setMode) {
+            window.electronAPI.setMode(m);
+          }
+        }}
       />
 
       {/* Оффлайн отчет */}

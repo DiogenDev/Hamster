@@ -86,6 +86,7 @@ export type SettingsTab =
   | 'skin'
   | 'zen'
   | 'pet'
+  | 'windows'
   | 'audio';
 
 export interface SettingsModalProps {
@@ -278,6 +279,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [floor3Toy, setFloor3Toy] = useState<Floor3ToyId>(currentTierToys?.floor3Toy || 'telescope');
   const [confirmReset, setConfirmReset] = useState<boolean>(false);
 
+  // Настройки Windows (Десктоп, Обои, Автозагрузка)
+  const [wallpaperCamera, setWallpaperCamera] = useState<'all' | 'follow'>('follow');
+  const [wallpaperScale, setWallpaperScale] = useState<number>(100);
+  const [btnOpacity, setBtnOpacity] = useState<number>(70);
+  const [winNotifLimit, setWinNotifLimit] = useState<number>(1);
+  const [isWinAutostart, setIsWinAutostart] = useState<boolean>(false);
+
   // Состояние музыкального плеера для вкладки "Музыка"
   const [musicState, setMusicState] = useState(musicPlayer.getStatus());
 
@@ -358,6 +366,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
     onSaveFurniture(furniture);
     setNotificationsEnabled(notifEnabled);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('hamster_wallpaper_camera', wallpaperCamera);
+      localStorage.setItem('hamster_wallpaper_scale', String(wallpaperScale));
+      localStorage.setItem('hamster_wallpaper_opacity', String(btnOpacity));
+      localStorage.setItem('hamster_win_notif_limit', String(winNotifLimit));
+      if (window.electronAPI) {
+        window.electronAPI.setAutostart(isWinAutostart);
+      }
+    }
     soundManager.playSuccessJingle();
     onClose();
   };
@@ -385,6 +402,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     { id: 'skin', label: 'Скин', icon: '🖌️' },
     { id: 'zen', label: 'Дзен', icon: '✨' },
     { id: 'pet', label: 'Питомец', icon: '🐹' },
+    { id: 'windows', label: 'Windows', icon: '💻' },
     { id: 'audio', label: 'Оповещения & Звук', icon: '🔔' },
   ];
 
@@ -1595,7 +1613,191 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
           )}
 
-          {/* 7. ВКЛАДКА: ЗВУК И СБРОС */}
+          {/* 7. ВКЛАДКА: WINDOWS (ДЕКСТОП, ОБОИ, АВТОЗАГРУЗКА) */}
+          {activeTab === 'windows' && (
+            <div className="space-y-3 animate-fadeIn">
+              {/* Выбор режима работы на ПК */}
+              <div className="bg-retro-purple/80 p-3 rounded border border-black space-y-2">
+                <div className="text-[8px] text-retro-yellow font-bold flex items-center gap-1">
+                  <span>💻</span> РЕЖИМ ОТОБРАЖЕНИЯ НА WINDOWS:
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      soundManager.playClickSound();
+                      if (window.electronAPI) window.electronAPI.setMode('normal');
+                    }}
+                    className="p-2 rounded border border-black bg-retro-blue text-white text-[7.5px] font-bold text-center hover:scale-105 active:scale-95 transition-all"
+                  >
+                    🏠 Обычное окно
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      soundManager.playClickSound();
+                      if (window.electronAPI) window.electronAPI.setMode('pet');
+                      onClose();
+                    }}
+                    className="p-2 rounded border border-black bg-retro-yellow text-black text-[7.5px] font-bold text-center hover:scale-105 active:scale-95 transition-all"
+                  >
+                    🐾 Питомец на экране
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      soundManager.playClickSound();
+                      if (window.electronAPI) window.electronAPI.setMode('wallpaper');
+                      onClose();
+                    }}
+                    className="p-2 rounded border border-black bg-retro-green text-black text-[7.5px] font-bold text-center hover:scale-105 active:scale-95 transition-all"
+                  >
+                    🖼️ Живые обои
+                  </button>
+                </div>
+              </div>
+
+              {/* Настройки живых обоев */}
+              <div className="bg-retro-purple/80 p-3 rounded border border-black space-y-2.5">
+                <div className="text-[8px] text-retro-cyan font-bold">
+                  🖼️ КАСТОМИЗАЦИЯ КЛЕТКИ ДЛЯ ОБОЕВ:
+                </div>
+
+                {/* Режим камеры */}
+                <div>
+                  <div className="text-[7px] text-retro-grey mb-1">РЕЖИМ ОТОБРАЖЕНИЯ ЭТАЖЕЙ:</div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setWallpaperCamera('follow');
+                        soundManager.playClickSound();
+                      }}
+                      className={`p-1.5 rounded border text-[7.5px] font-bold ${
+                        wallpaperCamera === 'follow'
+                          ? 'border-retro-yellow bg-retro-blue text-white'
+                          : 'border-black bg-retro-dark text-retro-grey'
+                      }`}
+                    >
+                      🎥 1 этаж (слежка камеры)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setWallpaperCamera('all');
+                        soundManager.playClickSound();
+                      }}
+                      className={`p-1.5 rounded border text-[7.5px] font-bold ${
+                        wallpaperCamera === 'all'
+                          ? 'border-retro-yellow bg-retro-blue text-white'
+                          : 'border-black bg-retro-dark text-retro-grey'
+                      }`}
+                    >
+                      🏰 Сразу все 3 этажа
+                    </button>
+                  </div>
+                </div>
+
+                {/* Прозрачность кнопок */}
+                <div>
+                  <div className="flex justify-between text-[7px] text-retro-grey mb-1">
+                    <span>ПРОЗРАЧНОСТЬ КНОПОК И ПАНЕЛЕЙ:</span>
+                    <span>{btnOpacity}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="10"
+                    max="100"
+                    step="5"
+                    value={btnOpacity}
+                    onChange={(e) => setBtnOpacity(Number(e.target.value))}
+                    className="w-full h-1.5 bg-retro-dark rounded cursor-pointer"
+                  />
+                </div>
+
+                {/* Масштаб клетки */}
+                <div>
+                  <div className="flex justify-between text-[7px] text-retro-grey mb-1">
+                    <span>МАСШТАБ КЛЕТКИ:</span>
+                    <span>{wallpaperScale}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="50"
+                    max="120"
+                    step="5"
+                    value={wallpaperScale}
+                    onChange={(e) => setWallpaperScale(Number(e.target.value))}
+                    className="w-full h-1.5 bg-retro-dark rounded cursor-pointer"
+                  />
+                </div>
+              </div>
+
+              {/* Уведомления Windows и Автозагрузка */}
+              <div className="bg-retro-purple/80 p-3 rounded border border-black space-y-2.5">
+                {/* Лимит уведомлений в сутки */}
+                <div>
+                  <div className="text-[8px] text-retro-yellow font-bold mb-1">
+                    🔔 МАКСИМУМ УВЕДОМЛЕНИЙ WINDOWS В СУТКИ:
+                  </div>
+                  <div className="grid grid-cols-4 gap-1.5 pt-1">
+                    {[
+                      { val: 0, label: 'ВЫКЛ' },
+                      { val: 1, label: '1 в день' },
+                      { val: 2, label: '2 в день' },
+                      { val: 5, label: 'Без огр.' },
+                    ].map((opt) => (
+                      <button
+                        key={opt.val}
+                        type="button"
+                        onClick={() => {
+                          setWinNotifLimit(opt.val);
+                          soundManager.playClickSound();
+                        }}
+                        className={`py-1 px-1 rounded border text-[7px] font-bold text-center ${
+                          winNotifLimit === opt.val
+                            ? 'border-retro-yellow bg-retro-green text-black'
+                            : 'border-black bg-retro-dark text-retro-grey'
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Автозагрузка с Windows */}
+                <div className="flex justify-between items-center pt-2 border-t border-black/30">
+                  <div>
+                    <span className="text-[7.5px] text-white font-bold block">
+                      ⚡ АВТОЗАГРУЗКА С WINDOWS:
+                    </span>
+                    <span className="text-[6.5px] text-retro-grey block">
+                      Запуск хомячка при включении компьютера
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const next = !isWinAutostart;
+                      setIsWinAutostart(next);
+                      soundManager.playClickSound();
+                      if (window.electronAPI) {
+                        window.electronAPI.setAutostart(next);
+                      }
+                    }}
+                    className={`px-2.5 py-1 text-[7.5px] border border-black rounded ${
+                      isWinAutostart ? 'bg-retro-green text-black font-bold' : 'bg-retro-dark text-retro-grey'
+                    }`}
+                  >
+                    {isWinAutostart ? 'ВКЛЮЧЕНО ✓' : 'ВЫКЛЮЧЕНО'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 8. ВКЛАДКА: ЗВУК И СБРОС */}
           {activeTab === 'audio' && (
             <div className="space-y-3 animate-fadeIn">
               {/* Локальные уведомления о потребностях */}
