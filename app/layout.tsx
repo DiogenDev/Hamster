@@ -2,8 +2,8 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Пиксельный 2D Тамагочи: Хомячок',
-  description: 'Интерактивный ретро-симулятор хомячка с Canvas 2D, 20 окрасами, кастомизацией клетки и пиксельной мастерской',
+  title: 'Хомячок Диоген — Пиксельный 2D Тамагочи (Windows, Android, Web)',
+  description: 'Уютный пиксельный тамагочи-философ с режимом живых обоев, питомцем на рабочем столе Windows (Desktop Pet), 20 окрасами и интерактивной виллой.',
 };
 
 export const viewport: Viewport = {
@@ -29,7 +29,7 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body className="bg-[#181425] text-white h-[100dvh] w-full antialiased overflow-hidden m-0 p-0 select-none flex flex-col items-center justify-between">
+      <body className="bg-[#181425] text-white h-[100dvh] w-full antialiased overflow-hidden m-0 p-0 select-none">
         {children}
       </body>
     </html>

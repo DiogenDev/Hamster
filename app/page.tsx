@@ -50,6 +50,7 @@ import {
 } from '@/utils/notificationService';
 import { DesktopPetOverlay } from '@/components/DesktopPetOverlay';
 import { WindowsTutorialModal } from '@/components/WindowsTutorialModal';
+import { PreviewLandingPage } from '@/components/PreviewLandingPage';
 
 export default function TamagotchiPage() {
   const {
@@ -76,11 +77,21 @@ export default function TamagotchiPage() {
   const [wallpaperCamera, setWallpaperCamera] = useState<'all' | 'follow'>('follow');
   const [wallpaperScale, setWallpaperScale] = useState<number>(100);
   const [btnOpacity, setBtnOpacity] = useState<number>(70);
+  const [showLanding, setShowLanding] = useState<boolean>(false);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const searchParams = new URLSearchParams(window.location.search);
       const m = searchParams.get('mode') as any;
+      const isElectron = !!window.electronAPI?.isElectron;
+      const isCapacitor = !!(window as any).Capacitor?.isNativePlatform?.();
+      const playParam = searchParams.get('play') === 'true' || searchParams.get('mode') === 'game';
+
+      // На веб-сайте по умолчанию показываем превью-лендинг с ссылками на скачивание
+      if (!isElectron && !isCapacitor && !playParam && m !== 'pet' && m !== 'wallpaper') {
+        setShowLanding(true);
+      }
+
       if (m === 'pet' || m === 'wallpaper') {
         setAppMode(m);
       } else {
@@ -102,7 +113,6 @@ export default function TamagotchiPage() {
       const op = Number(localStorage.getItem('hamster_wallpaper_opacity') || 70);
       if (op) setBtnOpacity(op);
 
-      const isElectron = !!window.electronAPI?.isElectron;
       const seen = localStorage.getItem('hamster_win_tutorial_seen');
       if (isElectron && !seen && m !== 'pet') {
         setIsWindowsTutorialOpen(true);
@@ -500,6 +510,10 @@ export default function TamagotchiPage() {
     );
   }
 
+  if (showLanding) {
+    return <PreviewLandingPage onPlayOnline={() => setShowLanding(false)} />;
+  }
+
   if (appMode === 'pet') {
     return <DesktopPetOverlay />;
   }
@@ -561,6 +575,20 @@ export default function TamagotchiPage() {
               <span>⚙️</span>
               <span className="hidden sm:inline">Настройки</span>
               <span className="sm:hidden">Опции</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                soundManager.playClickSound();
+                setShowLanding(true);
+              }}
+              className="px-2 sm:px-2.5 py-0.5 sm:py-1 bg-retro-purple/80 hover:bg-retro-purple border border-retro-yellow/70 hover:border-retro-yellow rounded text-[7px] sm:text-[9px] text-retro-yellow font-pixel flex items-center gap-1 shadow-pixel-sm transition-all active:translate-y-0.5"
+              title="Сайт превью и ссылки на скачивание"
+            >
+              <span>🌐</span>
+              <span className="hidden sm:inline">Сайт / Скачать</span>
+              <span className="sm:hidden">Сайт</span>
             </button>
           </div>
         </header>
